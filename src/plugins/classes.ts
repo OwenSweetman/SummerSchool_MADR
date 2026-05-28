@@ -1,4 +1,5 @@
 import { cleanUpString } from "./utils";
+import { TcAnnotation } from "./tc-types";
 
 /**
  * This models a single MADR. A MADR is parsed using `MADR.g4` and parser.js
@@ -27,6 +28,7 @@ export class ArchitecturalDecisionRecord {
 		negativeConsequences: string[];
 	};
 	links: string[];
+	tc?: TcAnnotation;
 
 	constructor({
 		yaml = "",
@@ -47,6 +49,7 @@ export class ArchitecturalDecisionRecord {
 			negativeConsequences: [] as string[],
 		},
 		links = [] as string[],
+		tc = undefined as TcAnnotation | undefined,
 	} = {}) {
 		this.yaml = yaml;
 		this.title = title;
@@ -67,6 +70,7 @@ export class ArchitecturalDecisionRecord {
 		}
 		this.decisionOutcome = decisionOutcome;
 		this.links = links;
+		this.tc = tc;
 
 		// Assure invariants for decisionOutcome attribute
 		if (!Object.prototype.hasOwnProperty.call(this.decisionOutcome, "chosenOption")) {
@@ -187,6 +191,7 @@ export class ArchitecturalDecisionRecord {
 			negativeConsequences: string[];
 		};
 		links?: string[];
+		tc?: TcAnnotation;
 	}) {
 		this.yaml = fields.yaml ?? this.yaml;
 		this.title = fields.title ?? this.title;
@@ -198,6 +203,7 @@ export class ArchitecturalDecisionRecord {
 		this.decisionDrivers = fields.decisionDrivers ?? this.decisionDrivers;
 		this.decisionOutcome = fields.decisionOutcome ?? this.decisionOutcome;
 		this.links = fields.links ?? this.links;
+		this.tc = fields.tc ?? this.tc;
 		if (fields.consideredOptions && fields.consideredOptions.length) {
 			this.updateConsideredOptions(fields.consideredOptions);
 		}
