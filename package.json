@@ -181,6 +181,7 @@
 		"@rollup/plugin-typescript": "^8.3.3",
 		"@types/glob": "^7.2.0",
 		"@types/jest": "^28.1.4",
+		"@types/js-yaml": "^4.0.9",
 		"@types/lodash": "^4.14.182",
 		"@types/node": "14.x",
 		"@types/vscode": "^1.67.0",
@@ -217,6 +218,7 @@
 		"@vuelidate/core": "^2.0.0-alpha.42",
 		"@vuelidate/validators": "^2.0.0-alpha.30",
 		"antlr4": "^4.10.1",
+		"js-yaml": "^4.1.1",
 		"vue": "^3.2.37",
 		"vue-class-component": "^8.0.0-0",
 		"vue-draggable-next": "^2.1.1"
