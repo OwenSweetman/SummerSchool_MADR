@@ -139,7 +139,24 @@
 				"language": "markdown",
 				"path": "./snippets/snippets.json"
 			}
-		]
+		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "tc-dashboard",
+					"title": "TC Dashboard",
+					"icon": "assets/logo.png"
+				}
+			]
+		},
+		"views": {
+			"tc-dashboard": [
+				{
+					"id": "tcDashboard",
+					"name": "TC Annotations"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run package",
