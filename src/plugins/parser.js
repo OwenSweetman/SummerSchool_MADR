@@ -1,4 +1,5 @@
 import { cloneDeep, concat, replace } from "lodash";
+import { load as yamlLoad, dump as yamlDump } from "js-yaml";
 
 import antlr4 from "antlr4";
 import MADRLexer from "./parser/MADRLexer.js";
@@ -285,6 +286,77 @@ class MADRErrorListener extends antlr4.error.ErrorListener {
 }
 
 /**
+ * Extracts TC annotation fields from the raw YAML frontmatter string stored in adr.yaml
+ * and populates adr.tc. Does nothing if no TC fields are present.
+ * @param {ArchitecturalDecisionRecord} adr
+ */
+function parseTcFromYaml(adr) {
+	if (!adr.yaml) return;
+	const raw = adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "");
+	let parsed;
+	try {
+		parsed = yamlLoad(raw);
+	} catch (e) {
+		return;
+	}
+	if (!parsed || typeof parsed !== "object" || !parsed["tc-benefit"]) return;
+	adr.tc = {
+		benefit: parsed["tc-benefit"] ?? "",
+		category: parsed["tc-category"],
+		conditions: parsed["tc-conditions"] ?? "",
+		signals: {
+			tags: parsed["tc-signals"] ?? [],
+			note: parsed["tc-signals-note"],
+		},
+		confidence: parsed["tc-confidence"],
+		status: parsed["tc-status"],
+		related: parsed["tc-related"],
+	};
+}
+
+/**
+ * Merges the current adr.tc values back into the YAML frontmatter string (adr.yaml).
+ * Creates a new YAML block if one does not exist. Strips tc-* keys if adr.tc is undefined.
+ * @param {ArchitecturalDecisionRecord} adr
+ */
+function serializeTcToYaml(adr) {
+	if (!adr.yaml && !adr.tc) return;
+	const raw = adr.yaml ? adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "") : "";
+	let parsed;
+	try {
+		parsed = yamlLoad(raw) ?? {};
+	} catch (e) {
+		parsed = {};
+	}
+	if (typeof parsed !== "object") parsed = {};
+	if (adr.tc) {
+		parsed["tc-benefit"] = adr.tc.benefit;
+		parsed["tc-category"] = adr.tc.category;
+		parsed["tc-conditions"] = adr.tc.conditions;
+		parsed["tc-signals"] = adr.tc.signals.tags;
+		if (adr.tc.signals.note) {
+			parsed["tc-signals-note"] = adr.tc.signals.note;
+		} else {
+			delete parsed["tc-signals-note"];
+		}
+		parsed["tc-confidence"] = adr.tc.confidence;
+		if (adr.tc.status !== undefined) {
+			parsed["tc-status"] = adr.tc.status;
+		} else {
+			delete parsed["tc-status"];
+		}
+		if (adr.tc.related && adr.tc.related.length > 0) {
+			parsed["tc-related"] = adr.tc.related;
+		} else {
+			delete parsed["tc-related"];
+		}
+	} else {
+		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
+	}
+	adr.yaml = "---\n" + yamlDump(parsed) + "---\n";
+}
+
+/**
  * Converts a markdown into a MADR object.
  * @param {string} md
  * @returns {ArchitecturalDecisionRecord}
@@ -308,12 +380,14 @@ export function md2adr(md) {
 		printer.adr.conforming = false;
 	}
 	printer.adr.parseErrors = errorListener.syntaxErrors;
+	parseTcFromYaml(printer.adr);
 	return printer.adr;
 }
 
 export function adr2md(adrToParse) {
 	let adr = cloneDeep(adrToParse);
 	adr.cleanUp();
+	serializeTcToYaml(adr);
 	var md;
 
 	// YAML frontmatter (MADR 4.0). If adr.yaml is set we preserve it verbatim so that

@@ -1,4 +1,5 @@
 import { cleanUpString } from "./utils";
+import { TcAnnotation } from "./tc-types";
 
 /**
  * This models a single MADR 4.0. A MADR is parsed using `MADR.g4` and parser.js
@@ -35,6 +36,8 @@ export class ArchitecturalDecisionRecord {
 		confirmation: string;
 	};
 	moreInformation: string;
+	links: string[];
+	tc?: TcAnnotation;
 
 	constructor({
 		yaml = "",
@@ -62,6 +65,8 @@ export class ArchitecturalDecisionRecord {
 			confirmation: "",
 		},
 		moreInformation = "",
+		links = [] as string[],
+		tc = undefined as TcAnnotation | undefined,
 	} = {}) {
 		this.yaml = yaml;
 		this.title = title;
@@ -83,6 +88,8 @@ export class ArchitecturalDecisionRecord {
 		}
 		this.decisionOutcome = decisionOutcome;
 		this.moreInformation = moreInformation;
+		this.links = links;
+		this.tc = tc;
 
 		// Assure invariants for decisionOutcome attribute
 		if (!Object.prototype.hasOwnProperty.call(this.decisionOutcome, "chosenOption")) {
@@ -144,7 +151,7 @@ export class ArchitecturalDecisionRecord {
 			this[attr] = cleanUpString(this[attr]);
 		});
 
-		const stringArrayFieldNames = ["decisionMakers", "consulted", "informed", "decisionDrivers"];
+		const stringArrayFieldNames = ["decisionMakers", "consulted", "informed", "decisionDrivers", "links"];
 		stringArrayFieldNames.forEach((attr) => {
 			this[attr] = (this[attr] as string[]).map((el) => cleanUpString(el)).filter((el) => el !== "");
 		});
@@ -197,6 +204,8 @@ export class ArchitecturalDecisionRecord {
 			confirmation: string;
 		};
 		moreInformation?: string;
+		links?: string[];
+		tc?: TcAnnotation;
 	}) {
 		this.yaml = fields.yaml ?? this.yaml;
 		this.title = fields.title ?? this.title;
@@ -209,6 +218,8 @@ export class ArchitecturalDecisionRecord {
 		this.decisionDrivers = fields.decisionDrivers ?? this.decisionDrivers;
 		this.decisionOutcome = fields.decisionOutcome ?? this.decisionOutcome;
 		this.moreInformation = fields.moreInformation ?? this.moreInformation;
+		this.links = fields.links ?? this.links;
+		this.tc = fields.tc ?? this.tc;
 		if (fields.consideredOptions && fields.consideredOptions.length) {
 			this.updateConsideredOptions(fields.consideredOptions);
 		}
