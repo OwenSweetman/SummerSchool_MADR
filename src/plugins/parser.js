@@ -26,27 +26,13 @@ class MADRGenerator extends MADRListener {
 	}
 
 	enterYaml(ctx) {
-		this.adr.yaml = ctx.getText();
+		const rawYaml = ctx.getText();
+		this.adr.yaml = rawYaml;
+		this.parseYamlMetadata(rawYaml);
 	}
 
 	enterTitle(ctx) {
 		this.adr.title = naturalCase2titleCase(ctx.getText());
-	}
-
-	enterStatus(ctx) {
-		this.adr.status = ctx.getText();
-	}
-
-	enterDeciders(ctx) {
-		this.adr.deciders = ctx.getText();
-	}
-
-	enterDate(ctx) {
-		this.adr.date = ctx.getText();
-	}
-
-	enterTechnicalStory(ctx) {
-		this.adr.technicalStory = ctx.getText();
 	}
 
 	enterContextAndProblemStatement(ctx) {
@@ -92,12 +78,27 @@ class MADRGenerator extends MADRListener {
 		}
 	}
 
-	enterPositiveConsequences(ctx) {
-		this.addListItemsFromListToList(ctx.children[0], this.adr.decisionOutcome.positiveConsequences);
+	/**
+	 * Handles "### Consequences" — bullets prefixed "Good, because " / "Bad, because " in one list.
+	 */
+	enterConsequences(ctx) {
+		const tmp = [];
+		this.addListItemsFromListToList(ctx.children[0], tmp);
+		tmp.forEach((item) => {
+			const trimmed = item.trim();
+			if (trimmed.startsWith("Good, because ")) {
+				this.adr.decisionOutcome.consequences.good.push(trimmed.substring("Good, because ".length));
+			} else if (trimmed.startsWith("Bad, because ")) {
+				this.adr.decisionOutcome.consequences.bad.push(trimmed.substring("Bad, because ".length));
+			}
+		});
 	}
 
-	enterNegativeConsequences(ctx) {
-		this.addListItemsFromListToList(ctx.children[0], this.adr.decisionOutcome.negativeConsequences);
+	/**
+	 * Handles "### Confirmation" — free-form prose under Decision Outcome.
+	 */
+	enterConfirmation(ctx) {
+		this.adr.decisionOutcome.confirmation = ctx.getText();
 	}
 
 	/**
@@ -119,21 +120,96 @@ class MADRGenerator extends MADRListener {
 		}
 	}
 
-	enterProlist(ctx) {
-		if (this.currentOption) {
-			this.addListItemsFromListToList(ctx, this.currentOption.pros);
+	/**
+	 * Handles the mixed Good/Neutral/Bad argument list under each option.
+	 * The grammar consumes the prefix literal, so we walk children to recover which kind each bullet is.
+	 */
+	enterArgumentList(ctx) {
+		if (!this.currentOption) return;
+		let currentKind = null;
+		const textLineRuleIndex = MADRParser.ruleNames.indexOf("textLine");
+		for (const child of ctx.children || []) {
+			const text = typeof child.getText === "function" ? child.getText() : "";
+			if (text === "Good, because ") {
+				currentKind = "good";
+			} else if (text === "Neutral, because ") {
+				currentKind = "neutral";
+			} else if (text === "Bad, because ") {
+				currentKind = "bad";
+			} else if (currentKind != null && child.ruleIndex === textLineRuleIndex) {
+				const argText = text.trim();
+				if (argText) {
+					if (currentKind === "good") this.currentOption.pros.push(argText);
+					else if (currentKind === "neutral") this.currentOption.neutral.push(argText);
+					else if (currentKind === "bad") this.currentOption.cons.push(argText);
+				}
+				currentKind = null;
+			}
 		}
 	}
 
-	enterConlist(ctx) {
-		if (this.currentOption) {
-			this.addListItemsFromListToList(ctx, this.currentOption.cons);
+	enterMoreInformation(ctx) {
+		this.adr.moreInformation = ctx.getText();
+	}
+
+	/**
+	 * Minimal YAML parser for MADR 4.0 metadata. Handles:
+	 *   key: scalar           — populates a string field
+	 *   key: [a, b, c]        — populates a string[] field
+	 *   key: a, b, c          — populates a string[] field
+	 *   "quoted scalar"       — quotes stripped
+	 *   # comment lines       — skipped
+	 * For richer YAML (nested structures, block lists, multiline) use js-yaml in Track B.
+	 *
+	 * @param {string} yamlText the raw "---\n...\n---" block from the grammar
+	 */
+	parseYamlMetadata(yamlText) {
+		const inner = yamlText.replace(/^---\s*\n/, "").replace(/\n---\s*$/, "");
+		const lines = inner.split("\n");
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith("#")) continue;
+			const colonIdx = trimmed.indexOf(":");
+			if (colonIdx === -1) continue;
+			const key = trimmed.substring(0, colonIdx).trim();
+			let value = trimmed.substring(colonIdx + 1).trim();
+			if (
+				(value.startsWith('"') && value.endsWith('"')) ||
+				(value.startsWith("'") && value.endsWith("'"))
+			) {
+				value = value.substring(1, value.length - 1);
+			}
+			switch (key) {
+				case "status":
+					this.adr.status = value;
+					break;
+				case "date":
+					this.adr.date = value;
+					break;
+				case "decision-makers":
+					this.adr.decisionMakers = this.parseYamlList(value);
+					break;
+				case "consulted":
+					this.adr.consulted = this.parseYamlList(value);
+					break;
+				case "informed":
+					this.adr.informed = this.parseYamlList(value);
+					break;
+			}
 		}
 	}
 
-	enterLinks(ctx) {
-		this.addListItemsFromListToList(ctx.children[0], this.adr.links);
+	parseYamlList(value) {
+		let inner = value.trim();
+		if (inner.startsWith("[") && inner.endsWith("]")) {
+			inner = inner.substring(1, inner.length - 1);
+		}
+		return inner
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s) => s !== "");
 	}
+
 	/**
 	 *
 	 * @param {string} optTitle the title in the "Chosen option" part
@@ -313,28 +389,40 @@ export function adr2md(adrToParse) {
 	adr.cleanUp();
 	serializeTcToYaml(adr);
 	var md;
+
+	// YAML frontmatter (MADR 4.0). If adr.yaml is set we preserve it verbatim so that
+	// downstream custom fields (e.g. TC annotations added in Track B) survive a round-trip.
+	// Otherwise build the frontmatter from the structured metadata fields.
 	if (adr.yaml) {
 		md = adr.yaml;
-		md = md.concat("\n" + "# " + naturalCase2titleCase(adr.title) + "\n");
+		md = md.concat("\n# " + naturalCase2titleCase(adr.title) + "\n");
+	} else if (
+		adr.status ||
+		adr.date ||
+		adr.decisionMakers.length > 0 ||
+		adr.consulted.length > 0 ||
+		adr.informed.length > 0
+	) {
+		let yamlBody = "---\n";
+		if (adr.status) {
+			yamlBody += `status: "${adr.status}"\n`;
+		}
+		if (adr.date) {
+			yamlBody += `date: ${adr.date}\n`;
+		}
+		if (adr.decisionMakers.length > 0) {
+			yamlBody += `decision-makers: [${adr.decisionMakers.join(", ")}]\n`;
+		}
+		if (adr.consulted.length > 0) {
+			yamlBody += `consulted: [${adr.consulted.join(", ")}]\n`;
+		}
+		if (adr.informed.length > 0) {
+			yamlBody += `informed: [${adr.informed.join(", ")}]\n`;
+		}
+		yamlBody += "---\n";
+		md = yamlBody + "\n# " + naturalCase2titleCase(adr.title) + "\n";
 	} else {
 		md = "# " + naturalCase2titleCase(adr.title) + "\n";
-	}
-
-	if ((adr.status !== "" && adr.status !== "null") || adr.deciders.length > 0 || adr.date !== "") {
-		if (adr.status !== "" && adr.status !== "null") {
-			md = md.concat("\n* Status: " + adr.status.trim());
-		}
-		if (adr.deciders.length > 0) {
-			md = md.concat("\n* Deciders: " + adr.deciders);
-		}
-		if (adr.date !== "") {
-			md = md.concat("\n* Date: " + adr.date);
-		}
-		md = md.concat("\n");
-	}
-
-	if (adr.technicalStory !== "") {
-		md = md.concat("\nTechnical Story: " + adr.technicalStory + "\n");
 	}
 
 	if (adr.contextAndProblemStatement !== "") {
@@ -369,26 +457,40 @@ export function adr2md(adrToParse) {
 		md = md.concat('"\n');
 	}
 
-	if (adr.decisionOutcome.positiveConsequences.length > 0) {
-		md = md.concat("\n### Positive Consequences\n\n");
-		md = adr.decisionOutcome.positiveConsequences.reduce((total, con) => total + "* " + con + "\n", md);
-	}
-	if (adr.decisionOutcome.negativeConsequences.length > 0) {
-		md = md.concat("\n### Negative Consequences\n\n");
-		md = adr.decisionOutcome.negativeConsequences.reduce((total, con) => total + "* " + con + "\n", md);
+	// MADR 4.0: unified Consequences section (Good then Bad bullets in one list)
+	if (adr.decisionOutcome.consequences.good.length > 0 || adr.decisionOutcome.consequences.bad.length > 0) {
+		md = md.concat("\n### Consequences\n\n");
+		md = adr.decisionOutcome.consequences.good.reduce(
+			(total, c) => total + "* Good, because " + c + "\n",
+			md
+		);
+		md = adr.decisionOutcome.consequences.bad.reduce(
+			(total, c) => total + "* Bad, because " + c + "\n",
+			md
+		);
 	}
 
-	if (adr.consideredOptions.some((opt) => opt.description !== "" || opt.pros.length > 0 || opt.cons.length > 0)) {
+	// MADR 4.0: Confirmation — H3 under Decision Outcome
+	if (adr.decisionOutcome.confirmation !== "") {
+		md = md.concat("\n### Confirmation\n\n" + adr.decisionOutcome.confirmation + "\n");
+	}
+
+	if (
+		adr.consideredOptions.some(
+			(opt) => opt.description !== "" || opt.pros.length > 0 || opt.neutral.length > 0 || opt.cons.length > 0
+		)
+	) {
 		md = md.concat("\n## Pros and Cons of the Options\n");
 		md = adr.consideredOptions.reduce((total, opt) => {
-			if (opt.description !== "" || opt.pros.length > 0 || opt.cons.length > 0) {
+			if (opt.description !== "" || opt.pros.length > 0 || opt.neutral.length > 0 || opt.cons.length > 0) {
 				let res = total.concat("\n### " + createShortTitle(opt.title) + "\n");
 				if (opt.description !== "") {
 					res = res.concat("\n" + opt.description + "\n");
 				}
-				res = opt.pros.reduce((total, arg) => total.concat("\n* Good, because " + arg), res);
-				res = opt.cons.reduce((total, arg) => total.concat("\n* Bad, because " + arg), res);
-				if (opt.pros.length > 0 || opt.cons.length > 0) {
+				res = opt.pros.reduce((t, arg) => t.concat("\n* Good, because " + arg), res);
+				res = opt.neutral.reduce((t, arg) => t.concat("\n* Neutral, because " + arg), res);
+				res = opt.cons.reduce((t, arg) => t.concat("\n* Bad, because " + arg), res);
+				if (opt.pros.length > 0 || opt.neutral.length > 0 || opt.cons.length > 0) {
 					// insert final new line
 					res = res + "\n";
 				}
@@ -398,10 +500,12 @@ export function adr2md(adrToParse) {
 			}
 		}, md);
 	}
-	if (adr.links.length > 0) {
-		md = md.concat("\n## Links\n\n");
-		md = adr.links.reduce((total, link) => total + "* " + link + "\n", md);
+
+	// MADR 4.0: More Information — top-level H2 at the end (replaces 2.x Links section)
+	if (adr.moreInformation !== "") {
+		md = md.concat("\n## More Information\n\n" + adr.moreInformation + "\n");
 	}
+
 	return md;
 }
 
