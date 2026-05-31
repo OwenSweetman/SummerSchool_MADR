@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
+import { TcDashboardProvider } from "./TcDashboardProvider";
 import { cleanPathString, matchesMadrTitleFormat } from "./plugins/utils";
 import {
 	isSingleRootWorkspace,
@@ -30,6 +31,9 @@ import { AdrManagerCodeActionProvider } from "./AdrManagerCodeActionProvider";
 export function activate(context: vscode.ExtensionContext) {
 	// Add custom when clause context for ADR Directory
 	updateWhenClauseContexts();
+
+	// Register TC Dashboard Tree View
+	vscode.window.registerTreeDataProvider("tcDashboard", new TcDashboardProvider());
 
 	// Create diagnostics for ADR files
 	createAdrDiagnostics(context);
