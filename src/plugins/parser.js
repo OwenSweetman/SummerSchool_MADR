@@ -317,9 +317,11 @@ function parseTcFromYaml(adr) {
 /**
  * Merges the current adr.tc values back into the YAML frontmatter string (adr.yaml).
  * Creates a new YAML block if one does not exist. Strips tc-* keys if adr.tc is undefined.
+ * Pro-only fields (tc-status, tc-related) are only written when mode === 'professional'.
  * @param {ArchitecturalDecisionRecord} adr
+ * @param {'basic'|'professional'} mode
  */
-function serializeTcToYaml(adr) {
+function serializeTcToYaml(adr, mode = 'professional') {
 	if (!adr.yaml && !adr.tc) return;
 	const raw = adr.yaml ? adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "") : "";
 	let parsed;
@@ -340,12 +342,12 @@ function serializeTcToYaml(adr) {
 			delete parsed["tc-signals-note"];
 		}
 		parsed["tc-confidence"] = adr.tc.confidence;
-		if (adr.tc.status !== undefined) {
+		if (mode === 'professional' && adr.tc.status !== undefined) {
 			parsed["tc-status"] = adr.tc.status;
 		} else {
 			delete parsed["tc-status"];
 		}
-		if (adr.tc.related && adr.tc.related.length > 0) {
+		if (mode === 'professional' && adr.tc.related && adr.tc.related.length > 0) {
 			parsed["tc-related"] = adr.tc.related;
 		} else {
 			delete parsed["tc-related"];
@@ -384,10 +386,10 @@ export function md2adr(md) {
 	return printer.adr;
 }
 
-export function adr2md(adrToParse) {
+export function adr2md(adrToParse, mode = 'professional') {
 	let adr = cloneDeep(adrToParse);
 	adr.cleanUp();
-	serializeTcToYaml(adr);
+	serializeTcToYaml(adr, mode);
 	var md;
 
 	// YAML frontmatter (MADR 4.0). If adr.yaml is set we preserve it verbatim so that

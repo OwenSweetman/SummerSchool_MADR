@@ -384,7 +384,7 @@ export function createBasicAdr(fields: {
 	const newAdr = getAdrObjectFromFields(adrFields);
 
 	// Convert ADR object to Markdown and save it in the ADR Directory
-	const newMD = adr2md(newAdr);
+	const newMD = adr2md(newAdr, 'basic');
 	saveMarkdownToAdrDirectory(newMD, newAdr.title);
 }
 
@@ -418,7 +418,7 @@ export function createProfessionalAdr(fields: {
 	const newAdr = getAdrObjectFromFields(fields);
 
 	// Convert ADR object to Markdown and save it in the ADR Directory
-	const newMD = adr2md(newAdr);
+	const newMD = adr2md(newAdr, 'professional');
 	saveMarkdownToAdrDirectory(newMD, newAdr.title);
 }
 
@@ -469,7 +469,7 @@ export async function saveAdr(fields: {
 		});
 		const newUri = getRenamedUri(fileUri, adr.title);
 		await vscode.workspace.fs.rename(fileUri, newUri);
-		await vscode.workspace.fs.writeFile(newUri, new TextEncoder().encode(adr2md(adr)));
+		await vscode.workspace.fs.writeFile(newUri, new TextEncoder().encode(adr2md(adr, 'professional')));
 		return newUri;
 	} else {
 		vscode.window.showWarningMessage("ADR could not be found in the workspace.");
