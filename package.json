@@ -58,6 +58,12 @@
 				"command": "vscode-adr-manager.viewAdrFromContextMenu",
 				"title": "Open ADR Manager on This File",
 				"category": "ADR Manager"
+			},
+			{
+				"command": "vscode-adr-manager.refreshTcDashboard",
+				"title": "Refresh TC Dashboard",
+				"category": "ADR Manager",
+				"icon": "$(refresh)"
 			}
 		],
 		"configuration": {
@@ -131,6 +137,13 @@
 					"command": "vscode-adr-manager.viewAdrFromContextMenu",
 					"when": "resourceLangId == markdown && resourceFilename =~ /^\\d{4}((-|_)[^\\s-_?*:\"<>|\\/]+)+.md$/",
 					"group": "vscode-adr-manager"
+				}
+			],
+			"view/title": [
+				{
+					"command": "vscode-adr-manager.refreshTcDashboard",
+					"when": "view == tcDashboard",
+					"group": "navigation"
 				}
 			]
 		},

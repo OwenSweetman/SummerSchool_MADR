@@ -97,8 +97,8 @@ function isProfessionalAdr(adr: ArchitecturalDecisionRecord) {
 		adr.consideredOptions.some((option) => {
 			return option.pros.length || option.cons.length;
 		}) ||
-		adr.decisionOutcome.positiveConsequences.length ||
-		adr.decisionOutcome.negativeConsequences.length ||
+		adr.decisionOutcome.consequences.good.length ||
+		adr.decisionOutcome.consequences.bad.length ||
 		adr.links.length
 	);
 }
@@ -364,6 +364,7 @@ export function createBasicAdr(fields: {
 		title: string;
 		description: string;
 		pros: string[];
+		neutral: string[];
 		cons: string[];
 	}[];
 	chosenOption: string;
@@ -377,8 +378,8 @@ export function createBasicAdr(fields: {
 		decisionOutcome: {
 			chosenOption: fields.chosenOption,
 			explanation: fields.explanation,
-			positiveConsequences: [],
-			negativeConsequences: [],
+			consequences: { good: [] as string[], bad: [] as string[] },
+			confirmation: "",
 		},
 	};
 	const newAdr = getAdrObjectFromFields(adrFields);
@@ -405,13 +406,14 @@ export function createProfessionalAdr(fields: {
 		title: string;
 		description: string;
 		pros: string[];
+		neutral: string[];
 		cons: string[];
 	}[];
 	decisionOutcome: {
 		chosenOption: string;
 		explanation: string;
-		positiveConsequences: string[];
-		negativeConsequences: string[];
+		consequences: { good: string[]; bad: string[] };
+		confirmation: string;
 	};
 	links: string[];
 }) {
@@ -439,13 +441,14 @@ export async function saveAdr(fields: {
 		title: string;
 		description: string;
 		pros: string[];
+		neutral: string[];
 		cons: string[];
 	}[];
 	decisionOutcome?: {
 		chosenOption: string;
 		explanation: string;
-		positiveConsequences: string[];
-		negativeConsequences: string[];
+		consequences: { good: string[]; bad: string[] };
+		confirmation: string;
 	};
 	links?: string[];
 	fullPath: string;
@@ -459,8 +462,7 @@ export async function saveAdr(fields: {
 			title: fields.title,
 			date: fields.date,
 			status: fields.status,
-			deciders: fields.deciders,
-			technicalStory: fields.technicalStory,
+			decisionMakers: fields.deciders ? [fields.deciders] : undefined,
 			contextAndProblemStatement: fields.contextAndProblemStatement,
 			decisionDrivers: fields.decisionDrivers,
 			consideredOptions: fields.consideredOptions,
@@ -494,13 +496,14 @@ export function getAdrObjectFromFields(fields: {
 		title: string;
 		description: string;
 		pros: string[];
+		neutral: string[];
 		cons: string[];
 	}[];
 	decisionOutcome: {
 		chosenOption: string;
 		explanation: string;
-		positiveConsequences?: string[];
-		negativeConsequences?: string[];
+		consequences?: { good: string[]; bad: string[] };
+		confirmation?: string;
 	};
 	links?: string[];
 }): ArchitecturalDecisionRecord {
@@ -510,16 +513,15 @@ export function getAdrObjectFromFields(fields: {
 		title: fields.title,
 		date: fields.date ?? "",
 		status: fields.status ?? "",
-		deciders: fields.deciders ?? "",
-		technicalStory: fields.technicalStory ?? "",
+		decisionMakers: fields.deciders ? [fields.deciders] : [],
 		contextAndProblemStatement: fields.contextAndProblemStatement,
 		decisionDrivers: fields.decisionDrivers || [],
 		consideredOptions: fields.consideredOptions,
 		decisionOutcome: {
 			chosenOption: fields.decisionOutcome.chosenOption,
 			explanation: fields.decisionOutcome.explanation,
-			positiveConsequences: fields.decisionOutcome.positiveConsequences || [],
-			negativeConsequences: fields.decisionOutcome.negativeConsequences || [],
+			consequences: fields.decisionOutcome.consequences ?? { good: [], bad: [] },
+			confirmation: fields.decisionOutcome.confirmation ?? "",
 		},
 		links: fields.links || [],
 	});
