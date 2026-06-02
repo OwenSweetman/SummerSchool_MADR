@@ -307,7 +307,7 @@ async function extractListItems(fileUri: vscode.Uri, heading: string): Promise<s
 	const matches = [...text.matchAll(regex)];
 
 	// Clean matches
-	const result = matches.reduce((acc, curr) => {
+	const result = matches.reduce<string[]>((acc, curr) => {
 		// remove zero-width character
 		const [title, item] = curr.slice(1);
 		// check for correct heading
