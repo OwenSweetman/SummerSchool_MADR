@@ -1,5 +1,6 @@
 # Changelog
 
+* 0.2.0 - Migrated parser and data model from MADR 2.1.2 to MADR 4.0: metadata fields (status, date, decision-makers, consulted, informed) now read from YAML front matter; Positive/Negative Consequences merged into a single Consequences section; new Confirmation (H3) and More Information (H2) sections; Pros/Cons of the Options support Neutral bullets; removed standalone Links and Technical Story sections
 * 0.1.8 - Updated project repository, added introduction repository to extension description
 * 0.1.7 - Fixed bug where option description boxes after the first option were not auto-growing
 * 0.1.6 - Fixed spelling error in UI

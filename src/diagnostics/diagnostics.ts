@@ -15,6 +15,12 @@ export async function getDiagnostics(doc: vscode.TextDocument): Promise<vscode.D
 		consideredOptions: -1,
 		decisionOutcome: -1,
 	};
+	// indices of optional MADR 4.0 sections — only emit empty-section warnings if present
+	let indicesOfOptionalFields = {
+		consequences: -1,
+		confirmation: -1,
+		moreInformation: -1,
+	};
 
 	const rawText = doc.getText();
 	const textLines = rawText.split(/\r\n|\n/);
@@ -40,6 +46,17 @@ export async function getDiagnostics(doc: vscode.TextDocument): Promise<vscode.D
 			indicesOfRequiredFields.decisionOutcome = i;
 		}
 
+		// check MADR 4.0 optional sections
+		if (indicesOfOptionalFields.consequences === -1 && /^### Consequences/i.test(textLines[i])) {
+			indicesOfOptionalFields.consequences = i;
+		}
+		if (indicesOfOptionalFields.confirmation === -1 && /^### Confirmation/i.test(textLines[i])) {
+			indicesOfOptionalFields.confirmation = i;
+		}
+		if (indicesOfOptionalFields.moreInformation === -1 && /^## More Information/i.test(textLines[i])) {
+			indicesOfOptionalFields.moreInformation = i;
+		}
+
 		// check header lines
 		if (textLines[i].startsWith("#", 0)) {
 			diagnostics.push(...getHeaderDiagnostics(textLines[i], i));
@@ -62,8 +79,72 @@ export async function getDiagnostics(doc: vscode.TextDocument): Promise<vscode.D
 
 	// add diagnostics regarding required fields
 	diagnostics.push(...getRequiredFieldsDiagnostics(indicesOfRequiredFields, textLines));
+	// add empty-section diagnostics for MADR 4.0 optional sections
+	diagnostics.push(...getOptionalFieldsDiagnostics(indicesOfOptionalFields, textLines));
+	// add MADR 4.0 bullet-format diagnostics for Consequences and Pros/Cons sections
+	diagnostics.push(...getBulletFormatDiagnostics(textLines));
 
 	return diagnostics;
+}
+
+/**
+ * Walks the document tracking section context (Consequences vs. Pros/Cons option subsection)
+ * and emits MADR 4.0 diagnostics for bullets that don't follow the required Good/Bad/Neutral
+ * prefix format.
+ *
+ * Consequences bullets must start with 'Good, because ' or 'Bad, because '.
+ * Option-argument bullets (under '## Pros and Cons of the Options' > '### {option}') must
+ * additionally allow 'Neutral, because '.
+ */
+function getBulletFormatDiagnostics(lines: string[]): vscode.Diagnostic[] {
+	const bulletDiagnostics = new Array<vscode.Diagnostic>();
+	let inConsequences = false;
+	let inProsAndCons = false;
+	let inProsAndConsOption = false;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const trimmed = line.trim();
+
+		// Section transitions — any new heading resets sub-state
+		if (/^#\s/.test(line)) {
+			inConsequences = false;
+			inProsAndCons = false;
+			inProsAndConsOption = false;
+		} else if (/^##\s/.test(line)) {
+			inConsequences = false;
+			inProsAndConsOption = false;
+			inProsAndCons = /^##\s+Pros and Cons of the Options/i.test(line);
+		} else if (/^###\s/.test(line)) {
+			if (/^###\s+Consequences/i.test(line)) {
+				inConsequences = true;
+				inProsAndConsOption = false;
+			} else {
+				inConsequences = false;
+				inProsAndConsOption = inProsAndCons;
+			}
+		}
+
+		// Bullet checks — only enforce inside Consequences or option-argument lists
+		if (/^[*\-+]\s/.test(trimmed)) {
+			const bulletText = trimmed.replace(/^[*\-+]\s+/, "");
+			if (inConsequences) {
+				if (!/^(Good|Bad), because /.test(bulletText)) {
+					bulletDiagnostics.push(
+						allDiagnostics.consequences.malformedBullet(i, 0, i, line.length)
+					);
+				}
+			} else if (inProsAndConsOption) {
+				if (!/^(Good|Neutral|Bad), because /.test(bulletText)) {
+					bulletDiagnostics.push(
+						allDiagnostics.optionArgument.malformedBullet(i, 0, i, line.length)
+					);
+				}
+			}
+		}
+	}
+
+	return bulletDiagnostics;
 }
 
 /**
@@ -142,6 +223,45 @@ function getRequiredFieldsDiagnostics(
 	});
 
 	return requiredFieldsDiagnostics;
+}
+
+/**
+ * Returns an array of empty-section diagnostics for optional MADR 4.0 sections.
+ * Only emits .empty() — unlike required fields, missing optional sections are not flagged.
+ * @param indices Line numbers of optional sections, -1 if absent
+ * @param lines String array of the document's text lines
+ */
+function getOptionalFieldsDiagnostics(
+	indices: {
+		consequences: number;
+		confirmation: number;
+		moreInformation: number;
+	},
+	lines: string[]
+): vscode.Diagnostic[] {
+	const optionalFieldsDiagnostics = new Array<vscode.Diagnostic>();
+
+	Object.entries(indices).forEach(([key, value]) => {
+		if (value !== -1) {
+			const headerIndex = getIndexOfFirstHeaderLine(lines.slice(value + 1));
+			const indexOfNextHeaderLine = value + (headerIndex !== -1 ? headerIndex : lines.length - 1) + 1;
+
+			const sectionBody = lines.slice(value + 1, indexOfNextHeaderLine).join("\n").replace(/\s/g, "");
+			if (!sectionBody) {
+				const diagnosticKey = key as keyof typeof indices;
+				optionalFieldsDiagnostics.push(
+					allDiagnostics[diagnosticKey].empty(
+						value + 1,
+						0,
+						indexOfNextHeaderLine,
+						lines[indexOfNextHeaderLine - 1].length
+					)
+				);
+			}
+		}
+	});
+
+	return optionalFieldsDiagnostics;
 }
 
 /**
