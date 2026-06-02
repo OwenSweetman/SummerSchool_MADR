@@ -63,11 +63,17 @@ function confidenceLabel(c: TcConfidence | undefined): string {
 }
 
 function confidenceIcon(c: TcConfidence | undefined): vscode.ThemeIcon {
-	if (!c) {
-		return new vscode.ThemeIcon("circle-outline");
-	}
-	const color = c >= 4 ? "charts.green" : c === 3 ? "charts.yellow" : "charts.red";
-	return new vscode.ThemeIcon("shield", new vscode.ThemeColor(color));
+    if (!c) {
+        return new vscode.ThemeIcon("circle-outline");
+    }
+    const colorMap: Record<number, string> = {
+        1: "charts.red",
+        2: "charts.orange",
+        3: "charts.yellow",
+        4: "charts.green",
+        5: "terminal.ansiGreen",
+    };
+    return new vscode.ThemeIcon("circle-filled", new vscode.ThemeColor(colorMap[c]));
 }
 
 export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
