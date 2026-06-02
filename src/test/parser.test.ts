@@ -129,6 +129,61 @@ describe("TC annotation — parsing", () => {
 	});
 });
 
+describe("TC annotation — edge cases", () => {
+	test("partial TC fields: only benefit present, others absent — adr.tc defined, no crash", () => {
+		const md = `---
+tc-benefit: Some benefit
+---
+
+# Partial ADR
+
+## Decision Outcome
+
+Chosen option: "Option A"
+`;
+		const adr = md2adr(md);
+		expect(adr.tc).toBeDefined();
+		expect(adr.tc!.benefit).toBe("Some benefit");
+		expect(adr.tc!.category).toBeUndefined();
+		expect(adr.tc!.conditions).toBe("");
+		expect(adr.tc!.confidence).toBeUndefined();
+		expect(adr.tc!.signals.tags).toEqual([]);
+	});
+
+	test("unknown enum value in tc-category passes through without throwing", () => {
+		const md = `---
+tc-benefit: Some benefit
+tc-category: something-made-up
+tc-confidence: 3
+---
+
+# ADR
+
+## Decision Outcome
+
+Chosen option: "Option A"
+`;
+		expect(() => md2adr(md)).not.toThrow();
+		const adr = md2adr(md);
+		expect(adr.tc!.category).toBe("something-made-up");
+	});
+
+	test("basic mode serialise does not write tc-status or tc-related", () => {
+		const adr = md2adr(TC_MADR);
+		const result = adr2md(adr, 'basic');
+		expect(result).not.toContain("tc-status");
+		expect(result).not.toContain("tc-related");
+		expect(result).toContain("tc-benefit");
+	});
+
+	test("professional mode serialise writes tc-status and tc-related", () => {
+		const adr = md2adr(TC_MADR);
+		const result = adr2md(adr, 'professional');
+		expect(result).toContain("tc-status");
+		expect(result).toContain("tc-related");
+	});
+});
+
 describe("TC annotation — round-trip", () => {
 	test("TC fields survive a full parse → serialise → re-parse cycle", () => {
 		const adr1 = md2adr(TC_MADR);
