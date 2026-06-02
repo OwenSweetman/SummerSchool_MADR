@@ -332,6 +332,7 @@ function serializeTcToYaml(adr, mode = 'professional') {
 	}
 	if (typeof parsed !== "object") parsed = {};
 	if (adr.tc) {
+		parsed["tc-schema-version"] = 1;
 		parsed["tc-benefit"] = adr.tc.benefit;
 		parsed["tc-category"] = adr.tc.category;
 		parsed["tc-conditions"] = adr.tc.conditions;
