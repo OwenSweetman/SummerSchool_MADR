@@ -28,16 +28,17 @@ class AdrNode extends vscode.TreeItem {
 	constructor(public readonly entry: AdrEntry) {
 		const tc = entry.adr.tc;
 		super(entry.adr.title || entry.fileName, vscode.TreeItemCollapsibleState.Collapsed);
-		this.description = tc ? confidenceLabel(tc.confidence) : "no TC annotation";
+		const conformWarning = entry.adr.conforming ? "" : "  ⚠ MADR parse issues";
+		this.description = (tc ? confidenceLabel(tc.confidence) : "no TC annotation") + conformWarning;
 		this.tooltip = tc?.benefit ?? "";
-		this.iconPath = confidenceIcon(tc?.confidence);
+		this.iconPath = entry.adr.conforming ? confidenceIcon(tc?.confidence) : new vscode.ThemeIcon("warning");
 		this.contextValue = "tcAdr";
-		this.command = {
-			command: "vscode-adr-manager.openViewAdrWebView",
-			title: "Open in ADR Manager",
-			arguments: [fs.readFileSync(entry.fullPath, "utf8")],
-		};
 		this.resourceUri = vscode.Uri.file(entry.fullPath);
+		this.command = {
+			command: "vscode.open",
+			title: "Open ADR file",
+			arguments: [this.resourceUri],
+		};
 	}
 }
 
@@ -110,9 +111,11 @@ export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
 			return [placeholder];
 		}
 
-		const entries: AdrEntry[] = mds
-			.map((m) => ({ adr: md2adr(m.adr), fullPath: m.fullPath, fileName: m.fileName }))
-			.filter((e) => e.adr.conforming);
+		const entries: AdrEntry[] = mds.map((m) => ({
+			adr: md2adr(m.adr),
+			fullPath: m.fullPath,
+			fileName: m.fileName,
+		}));
 
 		const buckets = new Map<TcCategory | "unannotated", AdrEntry[]>();
 		for (const e of entries) {

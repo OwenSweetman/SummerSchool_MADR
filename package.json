@@ -158,7 +158,7 @@
 				{
 					"id": "tc-dashboard",
 					"title": "TC Dashboard",
-					"icon": "assets/logo.png"
+					"icon": "assets/tc-dashboard.svg"
 				}
 			]
 		},
