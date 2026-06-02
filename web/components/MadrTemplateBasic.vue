@@ -38,7 +38,7 @@
 			:key="dataFetched"
 		></TemplateDecisionOutcomeBasicSection>
 		<hr />
-		<TemplateTCAnnotationSection :key="dataFetched" />
+		<TemplateTCAnnotationSection :tc="tc" :key="dataFetched" />
 	</div>
 </template>
 

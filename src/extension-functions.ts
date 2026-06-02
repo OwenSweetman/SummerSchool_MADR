@@ -1,6 +1,7 @@
 // Functions using the VS Code Extension API
 import * as vscode from "vscode";
 import { ArchitecturalDecisionRecord } from "./plugins/classes";
+import { TcAnnotation } from "./plugins/tc-types";
 import {
 	adrTemplatemarkdownContent,
 	EXTENSION_URI,
@@ -368,6 +369,7 @@ export function createBasicAdr(fields: {
 	}[];
 	chosenOption: string;
 	explanation: string;
+	tc?: TcAnnotation;
 }) {
 	const adrFields = {
 		yaml: fields.yaml,
@@ -380,6 +382,7 @@ export function createBasicAdr(fields: {
 			positiveConsequences: [],
 			negativeConsequences: [],
 		},
+		tc: fields.tc,
 	};
 	const newAdr = getAdrObjectFromFields(adrFields);
 
@@ -414,6 +417,7 @@ export function createProfessionalAdr(fields: {
 		negativeConsequences: string[];
 	};
 	links: string[];
+	tc?: TcAnnotation;
 }) {
 	const newAdr = getAdrObjectFromFields(fields);
 
@@ -448,6 +452,7 @@ export async function saveAdr(fields: {
 		negativeConsequences: string[];
 	};
 	links?: string[];
+	tc?: TcAnnotation;
 	fullPath: string;
 }): Promise<vscode.Uri | undefined> {
 	// Update, convert ADR object to Markdown and save
@@ -466,6 +471,7 @@ export async function saveAdr(fields: {
 			consideredOptions: fields.consideredOptions,
 			decisionOutcome: fields.decisionOutcome,
 			links: fields.links,
+			tc: fields.tc,
 		});
 		const newUri = getRenamedUri(fileUri, adr.title);
 		await vscode.workspace.fs.rename(fileUri, newUri);
@@ -503,6 +509,7 @@ export function getAdrObjectFromFields(fields: {
 		negativeConsequences?: string[];
 	};
 	links?: string[];
+	tc?: TcAnnotation;
 }): ArchitecturalDecisionRecord {
 	// Create ADR object
 	const newAdr = new ArchitecturalDecisionRecord({
@@ -522,6 +529,7 @@ export function getAdrObjectFromFields(fields: {
 			negativeConsequences: fields.decisionOutcome.negativeConsequences || [],
 		},
 		links: fields.links || [],
+		tc: fields.tc,
 	});
 
 	newAdr.cleanUp();

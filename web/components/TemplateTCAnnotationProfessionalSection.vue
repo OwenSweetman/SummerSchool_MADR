@@ -29,14 +29,6 @@
 		</div>
 
 		<div class="tc-field">
-			<h3>Observable Signals</h3>
-			<div v-for="signal in signalOptions" :key="signal.value" class="signal-option">
-				<input type="checkbox" :value="signal.value" v-model="tcSignals" :id="signal.value" />
-				<label :for="signal.value">{{ signal.label }}</label>
-			</div>
-		</div>
-
-		<div class="tc-field">
 			<h3>Confidence Level: {{ tcConfidence }}</h3>
 			<input type="range" min="1" max="5" v-model="tcConfidence" />
 			<div class="confidence-labels">
@@ -47,6 +39,34 @@
 				<span>5 evidenced</span>
 			</div>
 		</div>
+
+		<div class="tc-field">
+			<h3>Observable Signals</h3>
+			<div v-for="signal in signalOptions" :key="signal.value" class="signal-option">
+				<input type="checkbox" :value="signal.value" v-model="tcSignals" :id="signal.value" />
+				<label :for="signal.value">{{ signal.label }}</label>
+			</div>
+		</div>
+
+		<div class="tc-field">
+			<h3>TC Status</h3>
+			<p class="field-prompt">Has this TC been realised? Update as the system evolves.</p>
+			<select v-model="tcStatus" class="category-select">
+				<option value="" disabled>Select a status</option>
+				<option value="anticipated">Anticipated</option>
+				<option value="realised">Realised</option>
+				<option value="partial">Partial</option>
+				<option value="not-yet-assessable">Not yet assessable</option>
+				<option value="failed">Failed</option>
+			</select>
+		</div>
+
+		<div class="tc-field">
+			<h3>Related Decisions</h3>
+			<input type="text" v-model="tcRelated" spellcheck="false"
+				placeholder="Which other decisions does this TC enable, depend on, or compound with?" />
+		</div>
+
 	</div>
 </template>
 
@@ -55,7 +75,7 @@ import { defineComponent } from "vue";
 import TemplateHeader from "./TemplateHeader.vue";
 
 export default defineComponent({
-	name: "TemplateTCAnnotationSection",
+	name: "TemplateTCAnnotationProfessionalSection",
 	components: {
 		TemplateHeader,
 	},
@@ -84,7 +104,6 @@ export default defineComponent({
 	computed: {
 		// Each binding reads/writes the matching field on the shared tc object so that
 		// the parent's reactive state (and the YAML it serializes to) stays in sync.
-		// The basic editor omits the pro-only status and related-decisions fields.
 		tcBenefit: {
 			get(): string {
 				return this.tc.benefit ?? "";
@@ -125,6 +144,27 @@ export default defineComponent({
 				this.tc.signals.tags = value;
 			},
 		},
+		tcStatus: {
+			get(): string {
+				return this.tc.status ?? "";
+			},
+			set(value: string) {
+				this.tc.status = value;
+			},
+		},
+		// The form exposes related decisions as a single comma-separated text field,
+		// while the stored model is a string array.
+		tcRelated: {
+			get(): string {
+				return (this.tc.related ?? []).join(", ");
+			},
+			set(value: string) {
+				this.tc.related = value
+					.split(",")
+					.map((entry) => entry.trim())
+					.filter((entry) => entry !== "");
+			},
+		},
 	},
 });
 </script>
@@ -148,6 +188,10 @@ export default defineComponent({
 	& input[type="range"] {
 		width: 100%;
 		margin: 0.5rem 0;
+	}
+
+	& input[type="text"] {
+		width: 100%;
 	}
 }
 
@@ -190,11 +234,5 @@ export default defineComponent({
 		outline: 1px solid var(--vscode-focusBorder);
 		border-color: var(--vscode-focusBorder);
 	}
-}
-.field-prompt {
-    font-style: italic;
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
 }
 </style>
