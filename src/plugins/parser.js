@@ -322,7 +322,10 @@ function parseTcFromYaml(adr) {
  * @param {'basic'|'professional'} mode
  */
 function serializeTcToYaml(adr, mode = 'professional') {
-	if (!adr.yaml && !adr.tc) return;
+	if (!adr.tc) {
+		// Only touch yaml if there are existing tc- keys that need stripping
+		if (!adr.yaml || !adr.yaml.includes("tc-")) return;
+	}
 	const raw = adr.yaml ? adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "") : "";
 	let parsed;
 	try {
