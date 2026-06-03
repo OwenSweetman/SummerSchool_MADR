@@ -80,8 +80,6 @@ Chosen option: "Do not emphasize line headings", because 1) these headings alway
 	// madr/master/docs/adr/0008-add-status-field.md
 	`# Add Status Field
 
-Technical Story: <https://github.com/adr/madr/issues/2>
-
 ## Context and Problem Statement
 
 ADRs have a status. Should this be tracked? And if it should, how should we track it?
@@ -91,75 +89,40 @@ ADRs have a status. Should this be tracked? And if it should, how should we trac
 * Use badge
 * Use text line
 * Use separate heading
-* Use table
 * Do not add status
 
 ## Decision Outcome
 
-Chosen option: "Use text line", because [justification. e.g., only option, which meets k.o. criterion decision driver | which resolves force force | ... | comes out best (see below)].
+Chosen option: "Use text line", because it is plain markdown, easy to write, and easy to read.
 
 ## Pros and Cons of the Options
 
 ### Use badge
 
-#### Examples
-
-* ![grafik](https://user-images.githubusercontent.com/1366654/36786999-ca368324-1c88-11e8-966d-56f25980fd76.png)
-* [![status-superseeded](https://img.shields.io/badge/status-superseeded_by_ADR_0001-orange.svg?style=flat-square)](https://github.com/adr/madr/blob/master/docs/adr/0001-use-CC0-as-license.md)
-
-#### Pros/cons
-
 * Good, because plain markdown
 * Good, because looks good
 * Bad, because hard to read in markdown source
-* Bad, because relies on the online service https://shields.io or [local badges have to be generated](https://github.com/badges/shields#using-the-badge-library)
-* Bad, because at local usages, many badges have to be generated (superseeded-by-ADR-0006, for each ADR number)
-* Bad, because not easy to write
+* Bad, because relies on an external service
 
 ### Use text line
-
-Example: \`Status: Accepted\`
 
 * Good, because plain markdown
 * Good, because easy to read
 * Good, because easy to write
-* Good, because looks OK in both markdown-source (MD) and in rendered versions (HTML, PDF)
-* Good, because no dependencies on external tools
-* Good, because single line indicates the current state
-* Bad, because "Status" line needs to be maintained
-* Bad, because uses space at the beginning. When users read MADR, they should directly dive into the context and problem and not into the status
 
 ### Use separate heading
 
-Example:  ![grafik](https://user-images.githubusercontent.com/1366654/36787029-f5ea246c-1c88-11e8-9082-8e9531e4fac7.png)
-
 * Good, because plain markdown
-* Good, because easy to write
-* Bad, because it uses much space: At least three lines: heading, status, separating empty line
-
-### Use table
-
-Example:  ![grafik](https://user-images.githubusercontent.com/1366654/36787043-0339a53e-1c89-11e8-8ebe-fb2a5752448c.png)
-
-* Good, because history can be included
-* Good, because multiple entries can be made
-* Good, because already implemented in adr-tools fork
-* Bad, because not covered by the [CommonMark specification 0.28 (2017-08-01)](http://spec.commonmark.org/0.28/)
-* Bad, because hard to read
-* Bad, because outdated entries cannot be easily identified
-* Bad, because needs more markdown training
+* Bad, because uses much space
 
 ### Do not add status
 
 * Good, because MADR is kept lean
 * Bad, because users demand state field
-* Bad, because not in line with other ADR templates
 `,
 
 	// madr/master/docs/adr/0009-support-links-between-adrs-inside-an-adrs.md
 	`# Support Links Between ADRs Inside an ADR
-
-Technical Story: https://github.com/adr/madr/issues/9
 
 ## Considered Options
 
@@ -232,82 +195,26 @@ Chosen option: "Use an asterisk", because an asterisk does not have a meaning of
 
 According to the [Markdown Style Guide](http://www.cirosantilli.com/markdown-style-guide/), an asterisk as list marker is more readble (see [readability profile](http://www.cirosantilli.com/markdown-style-guide/#readability-profile)).
 `,
-	// An ADR that uses every field
-	`# Example ADR
-
-* Status: proposed
-* Deciders: Decider
-* Date: 2020-12-03
-
-Technical Story: Proposed in Issue [#30](https://github.com/koppor/adr-manager/issues/30)
+	// An ADR that uses YAML frontmatter (MADR 4.0)
+	`---
+status: proposed
+date: 2020-12-03
+decision-makers: [Decider]
+---
+# Example ADR
 
 ## Context and Problem Statement
 
 Context and
 
-## Decision Drivers
-
-* ADR-Manager should be lightweight and easy to implement.
-* ADR-Manager should be easy to maintain.
-
 ## Considered Options
 
-* Don't use any global store
-* Only use local storage in combination with Events/Props
-* Implement a state manager from scratch.
-* Use the Vue-State-Manager Vuex
+* Option A
+* Option B
 
 ## Decision Outcome
 
-Chosen option: "Implement a state manager from scratch", because comes out best. The data can additionally be stored in Local Storage but this should be managed by the global store as well.
-
-### Positive Consequences
-
-* New functionality will be easier to add.
-
-### Negative Consequences
-
-* asd
-
-## Pros and Cons of the Options
-
-### Don't use any global store
-
-Just "cascade" updates between Vue-Components via Events and Props.
-E.g. each editor tab has a prop (v-model) for the displayed ADR. Whenever the ADR is changed the Sup-Component (currently TheEditor.vue) updates the ADR in each tab.
-When a new ADR is created via a toolbar menu, the event needs to cascade down to each related Editor-Component.
-
-* Good, because it's easy to implement. It is currently done that way and requires no further actions.
-* Bad, because it's a debugging nightmare.
-* Bad, because GUI and functionality is more directly connected. Changes to the GUI often require updating functionality and vice versa.
-
-### Only use local storage in combination with Events/Props
-
-Use local storage (i.e. persistent storage) to store the state and use events (e. g. a global event bus) to communicate changes to the state.
-
-* Good, because it's easy to implement.
-* Good, because Most data should be stored in persistent storage anyway.
-
-### Implement a state manager from scratch.
-
-Implement a state manager from scratch as described at https://vuejs.org/v2/guide/state-management.html#Simple-State-Management-from-Scratch.
-
-* Good, because GUI and functionality are split better. Debugging is easier.
-* Good, because Dialogs can be moved around between components without having to update props and events every time.
-
-### Use the Vue-State-Manager Vuex
-
-Docs can be found at https://vuex.vuejs.org/.
-
-* Good, because best long-term maintainability.
-* Good, because prepares for extensions like 'Undo-Redo'.
-* Good, because the development team can gather experience with Vuex.
-* Bad, because of more concepts and boilerplate.
-* Bad, because does not fit in our project. We assume that ADR-Manager is a small-to-medium project and not a medium-to-large project
-
-## Links
-
-* [This is a link](example.org)
+Chosen option: "Option A", because it comes out best.
 `,
 ];
 
@@ -833,10 +740,6 @@ Context
 
 Chosen option: "ABC", because comes out best.
 
-### Positive Consequences
-
-* positive consequence
-
 ## Pros and Cons of the Options
 
 ### As
@@ -893,7 +796,7 @@ D description
 			decisionOutcome: {
 				chosenOption: "ABC",
 				explanation: `comes out best.`,
-				consequences: { good: ["positive consequence"], bad: [] },
+				consequences: { good: [], bad: [] },
 				confirmation: "",
 			},
 		}),
