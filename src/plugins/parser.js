@@ -286,13 +286,22 @@ class MADRErrorListener extends antlr4.error.ErrorListener {
 }
 
 /**
+ * Strips the opening and closing --- fences from a raw YAML frontmatter string.
+ * @param {string} yaml
+ * @returns {string}
+ */
+function stripYamlFences(yaml) {
+	return yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "");
+}
+
+/**
  * Extracts TC annotation fields from the raw YAML frontmatter string stored in adr.yaml
  * and populates adr.tc. Does nothing if no TC fields are present.
  * @param {ArchitecturalDecisionRecord} adr
  */
 function parseTcFromYaml(adr) {
 	if (!adr.yaml) return;
-	const raw = adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "");
+	const raw = stripYamlFences(adr.yaml);
 	let parsed;
 	try {
 		parsed = yamlLoad(raw);
@@ -301,7 +310,7 @@ function parseTcFromYaml(adr) {
 	}
 	if (!parsed || typeof parsed !== "object" || !parsed["tc-benefit"]) return;
 	adr.tc = {
-		benefit: parsed["tc-benefit"] ?? "",
+		benefit: parsed["tc-benefit"],
 		category: parsed["tc-category"],
 		conditions: parsed["tc-conditions"] ?? "",
 		signals: {
@@ -315,6 +324,21 @@ function parseTcFromYaml(adr) {
 }
 
 /**
+ * Writes a pro-only TC field into the parsed YAML object, or deletes it if not in professional mode.
+ * @param {object} parsed
+ * @param {string} key
+ * @param {'basic'|'professional'} mode
+ * @param {*} value
+ */
+function writeProOnly(parsed, key, mode, value) {
+	if (mode === 'professional' && value !== undefined) {
+		parsed[key] = value;
+	} else {
+		delete parsed[key];
+	}
+}
+
+/**
  * Merges the current adr.tc values back into the YAML frontmatter string (adr.yaml).
  * Creates a new YAML block if one does not exist. Strips tc-* keys if adr.tc is undefined.
  * Pro-only fields (tc-status, tc-related) are only written when mode === 'professional'.
@@ -322,11 +346,8 @@ function parseTcFromYaml(adr) {
  * @param {'basic'|'professional'} mode
  */
 function serializeTcToYaml(adr, mode = 'professional') {
-	if (!adr.tc) {
-		// Only touch yaml if there are existing tc- keys that need stripping
-		if (!adr.yaml || !adr.yaml.includes("tc-")) return;
-	}
-	const raw = adr.yaml ? adr.yaml.replace(/^---\n?/, "").replace(/\n?---\n?$/, "") : "";
+	if (!adr.tc && (!adr.yaml || !adr.yaml.includes("tc-"))) return;
+	const raw = adr.yaml ? stripYamlFences(adr.yaml) : "";
 	let parsed;
 	try {
 		parsed = yamlLoad(raw) ?? {};
@@ -346,16 +367,8 @@ function serializeTcToYaml(adr, mode = 'professional') {
 			delete parsed["tc-signals-note"];
 		}
 		parsed["tc-confidence"] = adr.tc.confidence;
-		if (mode === 'professional' && adr.tc.status !== undefined) {
-			parsed["tc-status"] = adr.tc.status;
-		} else {
-			delete parsed["tc-status"];
-		}
-		if (mode === 'professional' && adr.tc.related && adr.tc.related.length > 0) {
-			parsed["tc-related"] = adr.tc.related;
-		} else {
-			delete parsed["tc-related"];
-		}
+		writeProOnly(parsed, "tc-status",  mode, adr.tc.status !== undefined ? adr.tc.status : undefined);
+		writeProOnly(parsed, "tc-related", mode, adr.tc.related?.length ? adr.tc.related : undefined);
 	} else {
 		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
 	}
