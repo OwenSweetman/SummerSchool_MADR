@@ -184,11 +184,31 @@ Chosen option: "Option A"
 	});
 });
 
+describe("TC annotation — consequence parsing", () => {
+	const CONSEQUENCES_MADR = `# Test ADR
+
+## Decision Outcome
+
+Chosen option: "Option A", because it is best.
+
+### Consequences
+
+* Good, because it improves modularity
+* Bad, because it adds complexity
+`;
+
+	test("Good/Bad consequence bullets are parsed into consequences.good and consequences.bad", () => {
+		const adr = md2adr(CONSEQUENCES_MADR);
+		expect(adr.decisionOutcome.consequences.good).toEqual(["it improves modularity"]);
+		expect(adr.decisionOutcome.consequences.bad).toEqual(["it adds complexity"]);
+	});
+});
+
 describe("TC annotation — round-trip", () => {
 	test("TC fields survive a full parse → serialise → re-parse cycle", () => {
 		const adr1 = md2adr(TC_MADR);
-		const adr2 = md2adr(adr2md(adr1));
-		expect(adr2.tc).toEqual(adr1.tc);
+		const roundTripped = md2adr(adr2md(adr1));
+		expect(roundTripped.tc).toEqual(adr1.tc);
 	});
 
 	test("MADR with no TC fields round-trips without gaining tc keys", () => {

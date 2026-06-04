@@ -26,7 +26,7 @@ export function validateTcAnnotation(tc: TcAnnotation): TcValidationError[] {
 		errors.push({ field: "conditions", message: "conditions is required" });
 	}
 
-	if (!tc.confidence) {
+	if (tc.confidence === null || tc.confidence === undefined) {
 		errors.push({ field: "confidence", message: "confidence is required" });
 	} else if (!Number.isInteger(tc.confidence) || tc.confidence < 1 || tc.confidence > 5) {
 		errors.push({ field: "confidence", message: `confidence must be an integer between 1 and 5, got: ${tc.confidence}` });

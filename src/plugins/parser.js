@@ -82,16 +82,9 @@ class MADRGenerator extends MADRListener {
 	 * Handles "### Consequences" — bullets prefixed "Good, because " / "Bad, because " in one list.
 	 */
 	enterConsequences(ctx) {
-		const tmp = [];
-		this.addListItemsFromListToList(ctx.children[0], tmp);
-		tmp.forEach((item) => {
-			const trimmed = item.trim();
-			if (trimmed.startsWith("Good, because ")) {
-				this.adr.decisionOutcome.consequences.good.push(trimmed.substring("Good, because ".length));
-			} else if (trimmed.startsWith("Bad, because ")) {
-				this.adr.decisionOutcome.consequences.bad.push(trimmed.substring("Bad, because ".length));
-			}
-		});
+		// The ANTLR adaptive prediction does not reliably produce textLine children
+		// for the consequences list, so bullet text is extracted via parseConsequencesFromMd
+		// called after the walk (see md2adr). This handler is intentionally left as a no-op.
 	}
 
 	/**
@@ -372,7 +365,27 @@ function serializeTcToYaml(adr, mode = 'professional') {
 	} else {
 		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
 	}
-	adr.yaml = "---\n" + yamlDump(parsed) + "---\n";
+	adr.yaml = "---\n" + yamlDump(parsed, { sortKeys: false }) + "---\n";
+}
+
+/**
+ * Extracts Good/Bad consequence bullets from the raw markdown string.
+ * The ANTLR adaptive prediction skips textLine in the consequences list context,
+ * so this regex pass is needed to reliably populate consequences after the walk.
+ * @param {string} md
+ * @param {ArchitecturalDecisionRecord} adr
+ */
+function parseConsequencesFromMd(md, adr) {
+	const match = md.match(/###\s+Consequences\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+	if (!match) return;
+	const bullets = match[1].split(/\n/).map((l) => l.replace(/^[*\-]\s+/, "").trim()).filter(Boolean);
+	bullets.forEach((text) => {
+		if (text.startsWith("Good, because ")) {
+			adr.decisionOutcome.consequences.good.push(text.substring("Good, because ".length));
+		} else if (text.startsWith("Bad, because ")) {
+			adr.decisionOutcome.consequences.bad.push(text.substring("Bad, because ".length));
+		}
+	});
 }
 
 /**
@@ -400,6 +413,7 @@ export function md2adr(md) {
 	}
 	printer.adr.parseErrors = errorListener.syntaxErrors;
 	parseTcFromYaml(printer.adr);
+	parseConsequencesFromMd(md, printer.adr);
 	return printer.adr;
 }
 
