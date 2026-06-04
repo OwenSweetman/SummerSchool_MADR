@@ -1,40 +1,9 @@
-import { TcAnnotation, TcCategory, TcSignal, TcStatus } from "./tc-types";
+import { TcAnnotation, VALID_CATEGORIES, VALID_SIGNALS, VALID_STATUSES } from "./tc-types";
 
 export interface TcValidationError {
 	field: string;
 	message: string;
 }
-
-const VALID_CATEGORIES: TcCategory[] = [
-	"abstraction",
-	"modularity",
-	"api-stability",
-	"automation",
-	"compliance-readiness",
-	"knowledge-preservation",
-	"configurability",
-	"observability",
-	"reusability",
-];
-
-const VALID_SIGNALS: TcSignal[] = [
-	"reduced-change-scope",
-	"interface-stability",
-	"faster-feature-delivery",
-	"no-structural-refactor",
-	"defect-reduction",
-	"compliance-absorbed",
-	"onboarding-speed",
-	"reuse-observed",
-];
-
-const VALID_STATUSES: TcStatus[] = [
-	"anticipated",
-	"realised",
-	"partial",
-	"not-yet-assessable",
-	"failed",
-];
 
 /**
  * Validates a TcAnnotation object against the TC schema.
@@ -49,7 +18,7 @@ export function validateTcAnnotation(tc: TcAnnotation): TcValidationError[] {
 
 	if (!tc.category) {
 		errors.push({ field: "category", message: "category is required" });
-	} else if (!VALID_CATEGORIES.includes(tc.category)) {
+	} else if (!(VALID_CATEGORIES as readonly string[]).includes(tc.category)) {
 		errors.push({ field: "category", message: `unknown category: '${tc.category}'` });
 	}
 
@@ -57,7 +26,7 @@ export function validateTcAnnotation(tc: TcAnnotation): TcValidationError[] {
 		errors.push({ field: "conditions", message: "conditions is required" });
 	}
 
-	if (!tc.confidence) {
+	if (tc.confidence === null || tc.confidence === undefined) {
 		errors.push({ field: "confidence", message: "confidence is required" });
 	} else if (!Number.isInteger(tc.confidence) || tc.confidence < 1 || tc.confidence > 5) {
 		errors.push({ field: "confidence", message: `confidence must be an integer between 1 and 5, got: ${tc.confidence}` });
@@ -65,13 +34,13 @@ export function validateTcAnnotation(tc: TcAnnotation): TcValidationError[] {
 
 	if (tc.signals?.tags) {
 		tc.signals.tags.forEach((tag) => {
-			if (!VALID_SIGNALS.includes(tag)) {
+			if (!(VALID_SIGNALS as readonly string[]).includes(tag)) {
 				errors.push({ field: "signals", message: `unknown signal tag: '${tag}'` });
 			}
 		});
 	}
 
-	if (tc.status !== undefined && !VALID_STATUSES.includes(tc.status)) {
+	if (tc.status !== undefined && !(VALID_STATUSES as readonly string[]).includes(tc.status)) {
 		errors.push({ field: "status", message: `unknown status: '${tc.status}'` });
 	}
 
