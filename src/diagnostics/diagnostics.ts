@@ -125,9 +125,10 @@ function getBulletFormatDiagnostics(lines: string[]): vscode.Diagnostic[] {
 			}
 		}
 
-		// Bullet checks — only enforce inside Consequences or option-argument lists
-		if (/^[*\-+]\s/.test(trimmed)) {
-			const bulletText = trimmed.replace(/^[*\-+]\s+/, "");
+		// Bullet checks — only enforce top-level bullets (col 0) inside Consequences or option-argument lists.
+		// Using `line` (not `trimmed`) ensures indented/nested bullets are not incorrectly flagged.
+		if (/^[*\-+]\s/.test(line)) {
+			const bulletText = line.replace(/^[*\-+]\s+/, "");
 			if (inConsequences) {
 				if (!/^(Good|Bad), because /.test(bulletText)) {
 					bulletDiagnostics.push(
@@ -199,6 +200,10 @@ function getRequiredFieldsDiagnostics(
 			// also check if a section is the last section of the ADR (i.e., there is no (sub)header line after it)
 			const headerIndex = getIndexOfFirstHeaderLine(lines.slice(value + 1));
 			const indexOfNextHeaderLine = value + (headerIndex !== -1 ? headerIndex : lines.length - 1) + 1;
+			// Clamp so we never reference a line past the end of the document, and never
+			// produce a zero-width range on a blank trailing line.
+			const endLine = Math.min(indexOfNextHeaderLine, lines.length - 1);
+			const endChar = Math.max(lines[endLine].length, 1);
 
 			// if section is empty
 			if (
@@ -213,8 +218,8 @@ function getRequiredFieldsDiagnostics(
 						allDiagnostics[diagnosticKey].empty(
 							value + 1,
 							0,
-							indexOfNextHeaderLine,
-							lines[indexOfNextHeaderLine - 1].length
+							endLine,
+							endChar
 						)
 					);
 				}
@@ -245,6 +250,10 @@ function getOptionalFieldsDiagnostics(
 		if (value !== -1) {
 			const headerIndex = getIndexOfFirstHeaderLine(lines.slice(value + 1));
 			const indexOfNextHeaderLine = value + (headerIndex !== -1 ? headerIndex : lines.length - 1) + 1;
+			// Clamp so we never reference a line past the end of the document, and never
+			// produce a zero-width range on a blank trailing line.
+			const endLine = Math.min(indexOfNextHeaderLine, lines.length - 1);
+			const endChar = Math.max(lines[endLine].length, 1);
 
 			const sectionBody = lines.slice(value + 1, indexOfNextHeaderLine).join("\n").replace(/\s/g, "");
 			if (!sectionBody) {
@@ -253,8 +262,8 @@ function getOptionalFieldsDiagnostics(
 					allDiagnostics[diagnosticKey].empty(
 						value + 1,
 						0,
-						indexOfNextHeaderLine,
-						lines[indexOfNextHeaderLine - 1].length
+						endLine,
+						endChar
 					)
 				);
 			}
