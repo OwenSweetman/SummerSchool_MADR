@@ -1,6 +1,7 @@
 // Functions using the VS Code Extension API
 import * as vscode from "vscode";
 import { ArchitecturalDecisionRecord } from "./plugins/classes";
+import { TcAnnotation } from "./plugins/tc-types";
 import {
 	adrTemplatemarkdownContent,
 	EXTENSION_URI,
@@ -91,10 +92,17 @@ function isProfessionalAdr(adr: ArchitecturalDecisionRecord) {
 	return (
 		adr.status ||
 		adr.date ||
+		adr.decisionMakers.length ||
+		adr.consulted.length ||
+		adr.informed.length ||
 		adr.decisionDrivers.length ||
-		adr.consideredOptions.some((option) => option.pros.length || option.neutral.length || option.cons.length) ||
+		adr.consideredOptions.some((option) => {
+			return option.pros.length || option.neutral.length || option.cons.length;
+		}) ||
 		adr.decisionOutcome.consequences.good.length ||
 		adr.decisionOutcome.consequences.bad.length ||
+		adr.decisionOutcome.confirmation ||
+		adr.moreInformation ||
 		adr.links.length
 	);
 }
@@ -365,6 +373,7 @@ export function createBasicAdr(fields: {
 	}[];
 	chosenOption: string;
 	explanation: string;
+	tc?: TcAnnotation;
 }) {
 	const adrFields = {
 		yaml: fields.yaml,
@@ -377,6 +386,7 @@ export function createBasicAdr(fields: {
 			consequences: { good: [] as string[], bad: [] as string[] },
 			confirmation: "",
 		},
+		tc: fields.tc,
 	};
 	const newAdr = getAdrObjectFromFields(adrFields);
 
@@ -399,6 +409,7 @@ export function createProfessionalAdr(fields: {
 	consulted: string[];
 	informed: string[];
 	contextAndProblemStatement: string;
+	decisionDrivers?: string[];
 	consideredOptions: {
 		title: string;
 		description: string;
@@ -414,6 +425,7 @@ export function createProfessionalAdr(fields: {
 	};
 	moreInformation: string;
 	links: string[];
+	tc?: TcAnnotation;
 }) {
 	const newAdr = getAdrObjectFromFields(fields);
 
@@ -449,7 +461,9 @@ export async function saveAdr(fields: {
 		consequences: { good: string[]; bad: string[] };
 		confirmation: string;
 	};
+	moreInformation?: string;
 	links?: string[];
+	tc?: TcAnnotation;
 	fullPath: string;
 }): Promise<vscode.Uri | undefined> {
 	// Update, convert ADR object to Markdown and save
@@ -468,7 +482,9 @@ export async function saveAdr(fields: {
 			decisionDrivers: fields.decisionDrivers,
 			consideredOptions: fields.consideredOptions,
 			decisionOutcome: fields.decisionOutcome,
+			moreInformation: fields.moreInformation,
 			links: fields.links,
+			tc: fields.tc,
 		});
 		const newUri = getRenamedUri(fileUri, adr.title);
 		await vscode.workspace.fs.rename(fileUri, newUri);
@@ -509,6 +525,7 @@ export function getAdrObjectFromFields(fields: {
 	};
 	moreInformation?: string;
 	links?: string[];
+	tc?: TcAnnotation;
 }): ArchitecturalDecisionRecord {
 	// Create ADR object
 	const newAdr = new ArchitecturalDecisionRecord({
@@ -525,11 +542,12 @@ export function getAdrObjectFromFields(fields: {
 		decisionOutcome: {
 			chosenOption: fields.decisionOutcome.chosenOption,
 			explanation: fields.decisionOutcome.explanation,
-			consequences: fields.decisionOutcome.consequences ?? { good: [], bad: [] },
+			consequences: fields.decisionOutcome.consequences ?? { good: [] as string[], bad: [] as string[] },
 			confirmation: fields.decisionOutcome.confirmation ?? "",
 		},
 		moreInformation: fields.moreInformation ?? "",
 		links: fields.links || [],
+		tc: fields.tc,
 	});
 
 	newAdr.cleanUp();
