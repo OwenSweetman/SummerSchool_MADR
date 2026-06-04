@@ -2,41 +2,42 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, "track-*", "Track-*"]
   pull_request:
     branches: [master]
 
 jobs:
-  test:
-    name: Test and build
+  build:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [16.x, 18.x]
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js ${{ matrix.node-version }}
+      - name: Use Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
+          node-version: "18"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check
-        run: npm run compile-tests
-
-      - name: Run tests
-        run: npx jest --ci
-
-      - name: Build extension (webpack)
-        run: npm run compile
-
       - name: Lint
         run: npm run lint
-        continue-on-error: true # remove once lint is clean across the repo
+
+      - name: Test
+        run: npx jest --ci
+
+      - name: Build extension + webview
+        run: npm run package
+
+      - name: Package .vsix
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --no-dependencies --out vscode-adr-manager.vsix
+
+      - name: Upload .vsix artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-adr-manager-vsix
+          path: vscode-adr-manager.vsix
