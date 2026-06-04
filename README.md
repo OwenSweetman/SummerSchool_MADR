@@ -1,10 +1,10 @@
 # ADR Manager VS Code Extension
 
-Visual Studio Code (VS Code) extension based on the [ADR Manager](https://github.com/adr/adr-manager), providing features for managing Architectural Decision Records (ADRs) based on the [MADR template](https://adr.github.io/madr/) in the version 4.0.
+Visual Studio Code (VS Code) extension based on the [ADR Manager](https://github.com/adr/adr-manager), providing features for managing Architectural Decision Records (ADRs) based on the [MADR template](https://adr.github.io/madr/) in the version 4.0. In addition to managing standard MADR 4.0 ADRs, this extension supports **Technical Credit (TC) annotations** — structured metadata that captures the long-term architectural value of a decision — and a **TC Dashboard** sidebar that surfaces TC annotations across all ADRs in a workspace.
 
 A quick introduction to all the features of this extension is available [here](https://github.com/adr/vscode-adr-manager-introduction).
 
-This VS Code extension is part of a Bachelor Thesis written at the University of Stuttgart by Steven Chen.
+This VS Code extension is part of a Bachelor Thesis written at the University of Stuttgart by Steven Chen, extended with MADR 4.0 support and Technical Credit annotations as part of the Technical Credit summer school research programme.
 
 # Index
 1. [Workspace Concept](#workspace-concept)
@@ -13,11 +13,13 @@ This VS Code extension is part of a Bachelor Thesis written at the University of
     3. [Special Case: Single-root Workspace with only Subfolders](#special-case-single-root-workspace-with-only-subfolders)
 2. [Features](#features)
     1. [Commands](#commands)
-    2. [Settings](#settings)
-    3. [Menus](#menus)
-    4. [Linting](#linting)
-3. [Technical Credit Annotations](#technical-credit-annotations)
-4. [Known Issues](#known-issues)
+    2. [TC Annotations](#tc-annotations)
+    3. [TC Dashboard](#tc-dashboard)
+    4. [Menus](#menus)
+    5. [Linting](#linting)
+    6. [Snippets](#snippets)
+    7. [Settings](#settings)
+3. [Known Issues](#known-issues)
 
 ## Workspace Concept
 
@@ -56,7 +58,7 @@ As of now, the following commands are supported by this extension:
 
 If the content of a potential ADR detected by the extension does not conform to MADR, an error message will be shown and the user won't be able to view the Markdown file using the provided MADR template(s).
 
-* `Add New ADR`: Opens a webview panel where the user can add a new ADR using the MADR template(s) provided by the extension. The user can choose between a basic template with only the required fields of an ADR and the professional template, displaying all options of MADR.<br/>
+* `Add New ADR`: Opens a webview panel where the user can add a new ADR using the MADR template(s) provided by the extension. The user can choose between a basic template with only the required fields of an ADR and the professional template, displaying all options of MADR 4.0 along with optional Technical Credit (TC) annotation fields.<br/>
 The extension chooses the basic or the professional MADR template according to the user's preferences configured in the user/workspace settings.<br/>
 If the user is working in a multi-root workspace (or a multi-root-like workspace), the extension will ask the user in which ADR Directory of which root folder the newly created ADR should be saved to.
 
@@ -71,6 +73,30 @@ Alternatively, this can be configured in the user/workspace settings.
 If the ADR Directory already exists in the workspace folder, the extension will ask the user if he wants to generate the boilerplate files or not.<br/>
 If the user is working in a multi-root workspace (or  a multi-root-like workspace), the extension will ask the user for the root folder in which the ADR Directory should be initialized.
 
+### TC Annotations
+
+Technical Credit (TC) annotations capture the long-term architectural value a decision creates — the opposite of technical debt. They live in the YAML front-matter of an ADR, prefixed `tc-` to avoid collision with standard MADR fields.
+
+The schema defines four **core** fields shown in both basic and professional mode, plus two **extended** fields shown in professional mode only:
+
+| Field | Mode | Description |
+|---|---|---|
+| `tc-benefit` | Both | Free text describing the long-term advantage the decision creates. Requires `tc-category` alongside. |
+| `tc-category` | Both | Single tag from the TC taxonomy (e.g. `abstraction`, `modularity`, `api-stability`, `automation`, `compliance-readiness`, `knowledge-preservation`, `configurability`, `observability`, `reusability`). |
+| `tc-conditions` | Both | Free text describing under what circumstances the benefit will materialise. |
+| `tc-signals` | Both | List of observable-signal tags (e.g. `interface-stability`, `reduced-change-scope`, `defect-reduction`) plus an optional free-text note. |
+| `tc-confidence` | Both | Ordinal value 1–5 (1 speculative · 2 low · 3 moderate · 4 high · 5 evidenced). |
+| `tc-status` | Pro only | Enum updated over the ADR lifecycle: `anticipated`, `realised`, `partial`, `not-yet-assessable`, `failed`. |
+| `tc-related` | Pro only | List of related ADR references, e.g. `[ADR-003, ADR-011]`, capturing TC compounding across decisions. |
+
+When opening an ADR in the webview, TC annotation fields are surfaced alongside the standard MADR sections. The form respects the basic vs. professional mode setting — basic mode only shows the four core fields.
+
+### TC Dashboard
+
+The extension contributes a **TC Dashboard** sidebar panel in the VS Code Activity Bar. The dashboard scans all ADRs in the active workspace's ADR Directory and lists their TC annotations, with confidence indicators visualising the strength of each claim.
+
+The dashboard refreshes automatically when ADR files in the workspace change.
+
 ### Menus
 
 As of now, this extension contributes the following menus:
@@ -82,18 +108,31 @@ When right-clicking on a Markdown file that follows the naming convention of MAD
 
 As of now, this extension provides linting for potential ADR files for the following cases:
 
+**Required-section checks** (both MADR 2.x and 4.0):
+
 * If there is no header for the title
-* If there is no subheader for all other required fields of an ADR, i.e. if there is no subheader for 'Context and Problem Statement', 'Considered Options' or 'Decision Outcome'
-* If a required section, excluding the title, (i.e., 'Context and Problem Statement', 'Considered Options' or 'Decision Outcome') is empty
+* If there is no subheader for the required fields of an ADR, i.e. if there is no subheader for 'Context and Problem Statement', 'Considered Options' or 'Decision Outcome'
+* If a required section (excluding the title) is empty
 * If headings or subheadings are not written in title case
 * If the chosen option is not listed in the list of considered options
+
+**MADR 4.0 optional-section checks** (warnings only when the section is present but empty):
+
+* If the `### Consequences` section is present but contains no content
+* If the `### Confirmation` section is present but contains no content
+* If the `## More Information` section is present but contains no content
+
+**MADR 4.0 bullet-format checks**:
+
+* If a bullet inside `### Consequences` does not start with `Good, because ` or `Bad, because `
+* If a bullet inside a Pros/Cons option subsection does not start with `Good, because `, `Neutral, because `, or `Bad, because `
 
 ### Snippets
 
 As of now, this extension contributes the following snippets that can be inserted using IntelliSense or when typing certain keywords in a text editor:
 
-* `Basic ADR Template`: Inserts a template with only the required fields of a MADR (keyword: `basic-madr`, )
-* `Professional ADR Template`: Inserts a template with all fields of a MADR (keyword: `professional-madr`)
+* `Basic ADR Template`: Inserts a template with only the required fields of a MADR 4.0 ADR (keyword: `basic-madr`)
+* `Professional ADR Template`: Inserts a template with all fields of a MADR 4.0 ADR including YAML front-matter (`status`, `date`, `decision-makers`, `consulted`, `informed`) and the optional `### Consequences`, `### Confirmation`, and `## More Information` sections (keyword: `professional-madr`)
 
 ### Settings
 
@@ -109,76 +148,13 @@ As of now, this extension contributes the following settings:
 
 * `adrManager.showDiagnostics`: Specifies if the extension shows diagnostics in the text editor when working on ADR files (default: true)
 
-## Technical Credit Annotations
-
-This extension supports **Technical Credit (TC) annotations** — a way to document the long-term strategic value of architectural decisions directly inside MADR files. TC is the positive counterpart to Technical Debt: it captures decisions that create lasting value for system evolution.
-
-TC annotations are stored as structured fields in the YAML frontmatter of each MADR file, meaning they are human-readable, version-controlled alongside the ADR, and parseable by downstream tools.
-
-### YAML Schema
-
-A fully annotated MADR frontmatter looks like this:
-
-```yaml
----
-status: accepted
-date: 2024-01-15
-tc-schema-version: 1
-tc-benefit: Decouples service layer from DB engine; enables future migration
-tc-category: abstraction
-tc-conditions: System outlives current DB engine or performance requires migration
-tc-signals:
-  - interface-stability
-  - reduced-change-scope
-tc-confidence: 4
-tc-status: anticipated
-tc-related:
-  - ADR-003
----
-```
-
-### TC Fields
-
-| Field | Key | Type | Mode | Description |
-|---|---|---|---|---|
-| Anticipated benefit | `tc-benefit` | Free text | Both | Long-term value this construct creates |
-| TC category | `tc-category` | Enum | Both | One of 9 categories (see below) |
-| Realisation conditions | `tc-conditions` | Free text | Both | When the benefit will materialise |
-| Observable signals | `tc-signals` | Tag list | Both | Evidence TC is being realised or eroding |
-| Confidence level | `tc-confidence` | 1–5 ordinal | Both | 1 = speculative, 3 = moderate, 5 = evidenced |
-| TC status | `tc-status` | Enum | Professional | `anticipated` · `realised` · `partial` · `not-yet-assessable` · `failed` |
-| Related ADRs | `tc-related` | ADR-n list | Professional | Links to related decisions |
-
-**Category values:** `abstraction` · `modularity` · `api-stability` · `automation` · `compliance-readiness` · `knowledge-preservation` · `configurability` · `observability` · `reusability`
-
-**Signal tag values:** `reduced-change-scope` · `interface-stability` · `faster-feature-delivery` · `no-structural-refactor` · `defect-reduction` · `compliance-absorbed` · `onboarding-speed` · `reuse-observed`
-
-### Basic vs Professional Mode
-
-The first 5 fields (`tc-benefit`, `tc-category`, `tc-conditions`, `tc-signals`, `tc-confidence`) are available in both basic and professional editor modes. The `tc-status` and `tc-related` fields are only written to the file when using the professional template.
-
-### Schema Versioning
-
-When TC fields are first written to a MADR file, a `tc-schema-version: 1` key is added to the frontmatter. This allows future versions of the tool to detect which schema version a file was written with and apply migrations accordingly.
-
-### Developer Notes
-
-The TC data model lives in the following files:
-
-| File | Purpose |
-|---|---|
-| `src/plugins/tc-types.ts` | TypeScript interfaces and enum types for all TC fields |
-| `src/plugins/classes.ts` | `tc?: TcAnnotation` field on `ArchitecturalDecisionRecord` |
-| `src/plugins/parser.js` | `parseTcFromYaml()` and `serializeTcToYaml()` — read/write TC fields from YAML frontmatter |
-| `src/plugins/tc-validator.ts` | `validateTcAnnotation()` — validates all 6 field types, returns `TcValidationError[]` |
-
-To add a new TC field:
-1. Add the type to `TcAnnotation` in `tc-types.ts`
-2. Add the `tc-*` key to both `parseTcFromYaml` and `serializeTcToYaml` in `parser.js`
-3. Add a validation rule in `tc-validator.ts`
-4. Bump `tc-schema-version` to the next integer in `serializeTcToYaml`
-
 ## Known Issues
 
 This release is a prototype and may contain errors and bugs. Some features are not implemented yet and some implementations may be subject to change.<br/>
 It is aimed at generating feedback from user evaluation with select stakeholders.
+
+Known limitations as of this release:
+
+* The parser supports MADR 4.0 only. ADRs written in the legacy MADR 2.x format may parse with reduced fidelity. A back-compatibility decision is pending.
+* TC annotation values outside the documented taxonomy (e.g. an unknown `tc-category` value) are passed through without rejection but may surface validation warnings.
+* The TC Dashboard currently lists annotations from ADRs in the configured ADR Directory only; ADRs elsewhere in the workspace are not included.
