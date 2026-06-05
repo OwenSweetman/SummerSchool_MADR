@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
+
 import { md2adr } from "./plugins/parser";
 import { getAllMDs } from "./extension-functions";
 import { ArchitecturalDecisionRecord } from "./plugins/classes";
@@ -109,7 +109,15 @@ export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
 			return [placeholder];
 		}
 
-		const mds = await getAllMDs();
+		let mds: Awaited<ReturnType<typeof getAllMDs>>;
+		try {
+			mds = await getAllMDs();
+		} catch (e) {
+			const placeholder = new CategoryNode("unannotated", []);
+			placeholder.label = "Could not read ADR directory";
+			placeholder.collapsibleState = vscode.TreeItemCollapsibleState.None;
+			return [placeholder];
+		}
 		if (!mds.length) {
 			const placeholder = new CategoryNode("unannotated", []);
 			placeholder.label = "No ADRs found in ADR directory";
