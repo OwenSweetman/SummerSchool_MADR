@@ -1,6 +1,7 @@
 // Functions using the VS Code Extension API
 import * as vscode from "vscode";
 import { ArchitecturalDecisionRecord } from "./plugins/classes";
+import { TcAnnotation } from "./plugins/tc-types";
 import {
 	adrTemplatemarkdownContent,
 	EXTENSION_URI,
@@ -101,7 +102,8 @@ function isProfessionalAdr(adr: ArchitecturalDecisionRecord) {
 		adr.decisionOutcome.consequences.good.length ||
 		adr.decisionOutcome.consequences.bad.length ||
 		adr.decisionOutcome.confirmation ||
-		adr.moreInformation
+		adr.moreInformation ||
+		adr.links.length
 	);
 }
 
@@ -371,6 +373,7 @@ export function createBasicAdr(fields: {
 	}[];
 	chosenOption: string;
 	explanation: string;
+	tc?: TcAnnotation;
 }) {
 	const adrFields = {
 		yaml: fields.yaml,
@@ -383,6 +386,7 @@ export function createBasicAdr(fields: {
 			consequences: { good: [] as string[], bad: [] as string[] },
 			confirmation: "",
 		},
+		tc: fields.tc,
 	};
 	const newAdr = getAdrObjectFromFields(adrFields);
 
@@ -420,6 +424,8 @@ export function createProfessionalAdr(fields: {
 		confirmation: string;
 	};
 	moreInformation: string;
+	links: string[];
+	tc?: TcAnnotation;
 }) {
 	const newAdr = getAdrObjectFromFields(fields);
 
@@ -456,6 +462,8 @@ export async function saveAdr(fields: {
 		confirmation: string;
 	};
 	moreInformation?: string;
+	links?: string[];
+	tc?: TcAnnotation;
 	fullPath: string;
 }): Promise<vscode.Uri | undefined> {
 	// Update, convert ADR object to Markdown and save
@@ -475,6 +483,8 @@ export async function saveAdr(fields: {
 			consideredOptions: fields.consideredOptions,
 			decisionOutcome: fields.decisionOutcome,
 			moreInformation: fields.moreInformation,
+			links: fields.links,
+			tc: fields.tc,
 		});
 		const newUri = getRenamedUri(fileUri, adr.title);
 		await vscode.workspace.fs.rename(fileUri, newUri);
@@ -514,6 +524,8 @@ export function getAdrObjectFromFields(fields: {
 		confirmation?: string;
 	};
 	moreInformation?: string;
+	links?: string[];
+	tc?: TcAnnotation;
 }): ArchitecturalDecisionRecord {
 	// Create ADR object
 	const newAdr = new ArchitecturalDecisionRecord({
@@ -534,6 +546,8 @@ export function getAdrObjectFromFields(fields: {
 			confirmation: fields.decisionOutcome.confirmation ?? "",
 		},
 		moreInformation: fields.moreInformation ?? "",
+		links: fields.links || [],
+		tc: fields.tc,
 	});
 
 	newAdr.cleanUp();
