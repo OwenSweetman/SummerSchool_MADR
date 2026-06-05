@@ -140,4 +140,20 @@ export const allDiagnostics = {
 			};
 		},
 	},
+	chosenOption: {
+		notInConsideredOptions: (
+			startLine: number,
+			startCharacter: number,
+			endLine: number,
+			endCharacter: number
+		) => {
+			return {
+				severity: vscode.DiagnosticSeverity.Error,
+				message: "Chosen option is not in the list of considered options.",
+				code: "madr-chosen-option-not-in-considered-options",
+				source: "ADR Manager",
+				range: new vscode.Range(startLine, startCharacter, endLine, endCharacter),
+			};
+		},
+	},
 };
