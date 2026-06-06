@@ -17,7 +17,7 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By particip
 ### Local setup
 
 ```bash
-git clone https://github.com/adr/vscode-adr-manager.git
+git clone https://github.com/OwenSweetman/SummerSchool_MADR.git
 cd SummerSchool_MADR
 npm install
 ```
