@@ -244,6 +244,9 @@ export class WebPanel {
 
 		// Store the message — it will be sent once the webview signals "webviewReady"
 		// to avoid a race condition where postMessage fires before the Vue app has mounted.
+		//
+		// The webview components use the legacy MADR 2.x field names internally, so we map
+		// the MADR 4.0 data model fields to those names here at the boundary.
 		this._pendingAdrMessage = {
 			command: "fetchAdrValues",
 			adr: JSON.stringify({
@@ -251,12 +254,22 @@ export class WebPanel {
 				title: adr.title,
 				date: adr.date,
 				status: adr.status,
-				deciders: adr.deciders,
-				technicalStory: adr.technicalStory,
+				// MADR 4.0 → webview legacy mapping
+				deciders: adr.decisionMakers?.join(", ") ?? "",
+				technicalStory: "",
 				contextAndProblemStatement: adr.contextAndProblemStatement,
 				decisionDrivers: adr.decisionDrivers,
-				consideredOptions: adr.consideredOptions,
-				decisionOutcome: adr.decisionOutcome,
+				consideredOptions: adr.consideredOptions.map((o) => ({
+					...o,
+					pros: o.pros ?? [],
+					cons: o.cons ?? [],
+				})),
+				decisionOutcome: {
+					chosenOption: adr.decisionOutcome.chosenOption,
+					explanation: adr.decisionOutcome.explanation,
+					positiveConsequences: adr.decisionOutcome.consequences?.good ?? [],
+					negativeConsequences: adr.decisionOutcome.consequences?.bad ?? [],
+				},
 				links: adr.links,
 				tc: adr.tc,
 				fullPath: fileUri.path,
