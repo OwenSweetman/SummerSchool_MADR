@@ -2,7 +2,7 @@
 
 **Document architectural decisions. Keep everything clean and easy to find.**
 
-TC-ADR Manager brings [MADR 4.0](https://adr.github.io/madr/) Architectural Decision Records directly into VS Cod, but with a twist. Every ADR can be annotated with **Technical Credit (TC)** metadata that captures *why* a decision creates lasting value, not just what was decided.
+TC-ADR Manager brings [MADR 4.0](https://adr.github.io/madr/) Architectural Decision Records directly into VS Code, but with a twist. Every ADR can be annotated with **Technical Credit (TC)** metadata that captures *why* a decision creates lasting value, not just what was decided.
 
 Most teams write ADRs and forget them. TC-ADR Manager makes them actionable:
 
