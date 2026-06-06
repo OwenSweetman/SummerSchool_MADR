@@ -7,6 +7,8 @@ export default {
 	data() {
 		return {
 			validated: false,
+			conforming: true as boolean,
+			parseErrors: [] as { message: string; line: number; charPosition: number }[],
 			yaml: "",
 			title: "",
 			date: "",
@@ -197,6 +199,8 @@ export default {
 			this.links = fields.links;
 			this.tc = fields.tc ?? this.tc;
 			this.fullPath = fields.fullPath;
+			this.conforming = fields.conforming ?? true;
+			this.parseErrors = fields.parseErrors ?? [];
 		},
 		/**
 		 * Sets the validated flag to true if the template has been filled out properly, thus enabling the

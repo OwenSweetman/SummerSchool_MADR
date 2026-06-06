@@ -16,7 +16,7 @@
 				<b>{{ shortTitle }}</b>
 			</h3>
 		</div>
-		<i id="grabber" class="codicon codicon-grabber" :class="isHovered ? 'visible' : 'invisible'"></i>
+		<i class="grabber codicon codicon-grabber" :class="isHovered ? 'visible' : 'invisible'"></i>
 	</div>
 </template>
 
@@ -125,7 +125,7 @@
 		background: var(--vscode-editor-background);
 	}
 
-	#grabber {
+	.grabber {
 		position: absolute;
 		bottom: 0.2rem;
 		right: 45%;

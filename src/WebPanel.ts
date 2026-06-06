@@ -28,6 +28,7 @@ export class WebPanel {
 	private readonly _panel: vscode.WebviewPanel;
 	private readonly _extensionUri: vscode.Uri;
 	private _disposables: vscode.Disposable[] = [];
+	private _pendingAdrMessage: object | undefined;
 
 	/**
 	 * Creates or shows a panel that displays a webview with the specified view using a string key.
@@ -90,9 +91,18 @@ export class WebPanel {
 						vscode.commands.executeCommand("vscode-adr-manager.openAddAdrWebView");
 						return;
 					}
+					case "webviewReady": {
+						// Webview has mounted — send any pending ADR data now
+						if (this._pendingAdrMessage) {
+							this._panel.webview.postMessage(this._pendingAdrMessage);
+							this._pendingAdrMessage = undefined;
+						}
+						return;
+					}
 					case "view": {
 						const fileUri = vscode.Uri.file(e.data.fullPath);
 						await this.viewAdr(fileUri);
+						return;
 					}
 					case "fetchAdrs": {
 						this.fetchAdrs();
@@ -232,7 +242,9 @@ export class WebPanel {
 		// "view-basic" or "view-professional" as page argument doesn't matter here
 		this._updatePanelTitle("view-basic", adrNumber);
 
-		this._panel.webview.postMessage({
+		// Store the message — it will be sent once the webview signals "webviewReady"
+		// to avoid a race condition where postMessage fires before the Vue app has mounted.
+		this._pendingAdrMessage = {
 			command: "fetchAdrValues",
 			adr: JSON.stringify({
 				yaml: adr.yaml,
@@ -248,8 +260,10 @@ export class WebPanel {
 				links: adr.links,
 				tc: adr.tc,
 				fullPath: fileUri.path,
+				conforming: adr.conforming,
+				parseErrors: adr.parseErrors,
 			}),
-		});
+		};
 	}
 
 	/**
