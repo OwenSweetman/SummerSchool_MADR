@@ -1,5 +1,8 @@
 # Changelog
 
+* 0.2.2 - README update
+  * Updated README for marketplace listing
+
 * 0.2.1 - Marketplace publication and polish
   * Renamed extension to TC-ADR Manager
   * Updated README with improved description for marketplace listing
