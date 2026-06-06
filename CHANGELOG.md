@@ -1,5 +1,10 @@
 # Changelog
 
+* 0.2.1 - Marketplace publication and polish
+  * Renamed extension to TC-ADR Manager
+  * Updated README with improved description for marketplace listing
+  * Fixed edit/view button logic and non-conforming ADR error screen
+
 * 0.2.0 - MADR 4.0 migration and Technical Credit annotation support
   * Migrated parser and data model from MADR 2.1.2 to MADR 4.0 (updated grammar, YAML frontmatter for status/date/decision-makers, unified Consequences section, More Information section replacing Links)
   * Added TC annotation data model: `TcAnnotation` interface with 6 fields stored as `tc-*` YAML frontmatter keys
