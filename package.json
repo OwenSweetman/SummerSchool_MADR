@@ -2,7 +2,7 @@
 	"name": "tc-adr-manager",
 	"displayName": "TC-ADR Manager",
 	"description": "Manage Architectural Decision Records (ADRs) using MADR 4.0, with Technical Credit annotations and a TC inventory dashboard.",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"publisher": "NaftaliCaplan",
 	"icon": "assets/logo.png",
 	"repository": {
