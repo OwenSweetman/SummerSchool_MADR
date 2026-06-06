@@ -1,4 +1,4 @@
-# ADR Manager VS Code Extension
+# TC-ADR Manager VS Code Extension
 
 Visual Studio Code (VS Code) extension based on the [ADR Manager](https://github.com/adr/adr-manager), providing features for managing Architectural Decision Records (ADRs) based on the [MADR template](https://adr.github.io/madr/) in the version 4.0. In addition to managing standard MADR 4.0 ADRs, this extension supports **Technical Credit (TC) annotations** — structured metadata that captures the long-term architectural value of a decision — and a **TC Dashboard** sidebar that surfaces TC annotations across all ADRs in a workspace.
 

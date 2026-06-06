@@ -28,6 +28,7 @@ export class WebPanel {
 	private readonly _panel: vscode.WebviewPanel;
 	private readonly _extensionUri: vscode.Uri;
 	private _disposables: vscode.Disposable[] = [];
+	private _pendingAdrMessage: object | undefined;
 
 	/**
 	 * Creates or shows a panel that displays a webview with the specified view using a string key.
@@ -90,9 +91,18 @@ export class WebPanel {
 						vscode.commands.executeCommand("vscode-adr-manager.openAddAdrWebView");
 						return;
 					}
+					case "webviewReady": {
+						// Webview has mounted — send any pending ADR data now
+						if (this._pendingAdrMessage) {
+							this._panel.webview.postMessage(this._pendingAdrMessage);
+							this._pendingAdrMessage = undefined;
+						}
+						return;
+					}
 					case "view": {
 						const fileUri = vscode.Uri.file(e.data.fullPath);
 						await this.viewAdr(fileUri);
+						return;
 					}
 					case "fetchAdrs": {
 						this.fetchAdrs();
@@ -232,24 +242,41 @@ export class WebPanel {
 		// "view-basic" or "view-professional" as page argument doesn't matter here
 		this._updatePanelTitle("view-basic", adrNumber);
 
-		this._panel.webview.postMessage({
+		// Store the message — it will be sent once the webview signals "webviewReady"
+		// to avoid a race condition where postMessage fires before the Vue app has mounted.
+		//
+		// The webview components use the legacy MADR 2.x field names internally, so we map
+		// the MADR 4.0 data model fields to those names here at the boundary.
+		this._pendingAdrMessage = {
 			command: "fetchAdrValues",
 			adr: JSON.stringify({
 				yaml: adr.yaml,
 				title: adr.title,
 				date: adr.date,
 				status: adr.status,
-				deciders: adr.deciders,
-				technicalStory: adr.technicalStory,
+				// MADR 4.0 → webview legacy mapping
+				deciders: adr.decisionMakers?.join(", ") ?? "",
+				technicalStory: "",
 				contextAndProblemStatement: adr.contextAndProblemStatement,
 				decisionDrivers: adr.decisionDrivers,
-				consideredOptions: adr.consideredOptions,
-				decisionOutcome: adr.decisionOutcome,
+				consideredOptions: adr.consideredOptions.map((o) => ({
+					...o,
+					pros: o.pros ?? [],
+					cons: o.cons ?? [],
+				})),
+				decisionOutcome: {
+					chosenOption: adr.decisionOutcome.chosenOption,
+					explanation: adr.decisionOutcome.explanation,
+					positiveConsequences: adr.decisionOutcome.consequences?.good ?? [],
+					negativeConsequences: adr.decisionOutcome.consequences?.bad ?? [],
+				},
 				links: adr.links,
 				tc: adr.tc,
 				fullPath: fileUri.path,
+				conforming: adr.conforming,
+				parseErrors: adr.parseErrors,
 			}),
-		});
+		};
 	}
 
 	/**

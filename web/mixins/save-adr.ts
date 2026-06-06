@@ -7,6 +7,8 @@ export default {
 	data() {
 		return {
 			validated: false,
+			conforming: true as boolean,
+			parseErrors: [] as { message: string; line: number; charPosition: number }[],
 			yaml: "",
 			title: "",
 			date: "",
@@ -197,6 +199,8 @@ export default {
 			this.links = fields.links;
 			this.tc = fields.tc ?? this.tc;
 			this.fullPath = fields.fullPath;
+			this.conforming = fields.conforming ?? true;
+			this.parseErrors = fields.parseErrors ?? [];
 		},
 		/**
 		 * Sets the validated flag to true if the template has been filled out properly, thus enabling the
@@ -264,12 +268,23 @@ export default {
 						oldTitle: this.oldTitle,
 						date: this.date,
 						status: naturalCase2titleCase(this.status),
-						deciders: this.deciders,
-						technicalStory: this.technicalStory,
+						// Map webview legacy fields back to MADR 4.0 data model
+						decisionMakers: this.deciders ? this.deciders.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+						consulted: [],
+						informed: [],
 						contextAndProblemStatement: this.contextAndProblemStatement,
 						decisionDrivers: this.decisionDrivers,
 						consideredOptions: this.consideredOptions,
-						decisionOutcome: this.decisionOutcome,
+						decisionOutcome: {
+							chosenOption: this.decisionOutcome.chosenOption,
+							explanation: this.decisionOutcome.explanation,
+							consequences: {
+								good: this.decisionOutcome.positiveConsequences ?? [],
+								bad: this.decisionOutcome.negativeConsequences ?? [],
+							},
+							confirmation: "",
+						},
+						moreInformation: "",
 						links: this.links,
 						tc: this.tcForSaving,
 						fullPath: this.fullPath,

@@ -1,9 +1,9 @@
 {
-	"name": "vscode-adr-manager",
-	"displayName": "ADR Manager",
-	"description": "A VS Code extension for the ADR Manager, for documenting and managing MADRs in VS Code.",
+	"name": "tc-adr-manager",
+	"displayName": "TC-ADR Manager",
+	"description": "Manage Architectural Decision Records (ADRs) using MADR 4.0, with Technical Credit annotations and a TC inventory dashboard.",
 	"version": "0.2.0",
-	"publisher": "StevenChen",
+	"publisher": "NaftaliCaplan",
 	"icon": "assets/logo.png",
 	"repository": {
 		"type": "git",
