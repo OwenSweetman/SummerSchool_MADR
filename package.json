@@ -1,7 +1,7 @@
 {
-	"name": "summerschool-madr-extension",
-	"displayName": "SummerSchool_MADR_extension",
-	"description": "A VS Code extension for the ADR Manager, for documenting and managing MADRs in VS Code.",
+	"name": "tc-adr-manager",
+	"displayName": "TC-ADR Manager",
+	"description": "Manage Architectural Decision Records (ADRs) using MADR 4.0, with Technical Credit annotations and a TC inventory dashboard.",
 	"version": "0.2.0",
 	"publisher": "NaftaliCaplan",
 	"icon": "assets/logo.png",

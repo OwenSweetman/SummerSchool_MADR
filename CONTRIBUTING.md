@@ -1,4 +1,4 @@
-# Contributing to the ADR Manager VS Code Extension
+# Contributing to the TC-ADR Manager VS Code Extension
 
 Thanks for your interest in contributing. This document covers everything you need to get a local development environment running, understand the repository layout, and submit a change.
 
@@ -17,7 +17,7 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By particip
 ### Local setup
 
 ```bash
-git clone https://github.com/OwenSweetman/SummerSchool_MADR.git
+git clone https://github.com/adr/vscode-adr-manager.git
 cd SummerSchool_MADR
 npm install
 ```
@@ -31,7 +31,7 @@ npm install
 ### Running the tests
 
 ```bash
-npx jest                         # full test suite (~65 tests)
+npx jest                         # full test suite (82 tests)
 npx jest src/test/parser.test.ts # parser + TC annotation tests
 npm run compile-tests            # TypeScript type-check only
 npm run compile                  # webpack build of the extension runtime
