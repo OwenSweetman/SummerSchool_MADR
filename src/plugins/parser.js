@@ -111,7 +111,9 @@ class MADRGenerator extends MADRListener {
 	 * Handles "### Confirmation" — free-form prose under Decision Outcome.
 	 */
 	enterConfirmation(ctx) {
-		this.adr.decisionOutcome.confirmation = ctx.getText();
+		// No-op: confirmation is extracted via parseConfirmationFromMd after the walk.
+		// ANTLR tokenizes 'Good, because ' etc. as special tokens that multilineText
+		// cannot consume, so regex extraction is used instead.
 	}
 
 	/**
@@ -286,7 +288,10 @@ function parseTcFromYaml(adr) {
 	} catch (e) {
 		return;
 	}
-	if (!parsed || typeof parsed !== "object" || !parsed["tc-benefit"]) return;
+	// Require at least one tc-* key to be present before populating adr.tc
+	if (!parsed || typeof parsed !== "object") return;
+	const hasTcFields = Object.keys(parsed).some((k) => k.startsWith("tc-"));
+	if (!hasTcFields) return;
 	adr.tc = {
 		benefit: parsed["tc-benefit"],
 		category: parsed["tc-category"],
@@ -324,7 +329,16 @@ function writeProOnly(parsed, key, mode, value) {
  * @param {'basic'|'professional'} mode
  */
 function serializeTcToYaml(adr, mode = 'professional') {
-	if (!adr.tc && (!adr.yaml || !adr.yaml.includes("tc-"))) return;
+	// Determine whether we need a YAML block at all.
+	const hasMetadata = adr.status || adr.date ||
+		(adr.decisionMakers && adr.decisionMakers.length > 0) ||
+		(adr.consulted && adr.consulted.length > 0) ||
+		(adr.informed && adr.informed.length > 0);
+	const hasTc = !!adr.tc;
+	const hasExistingTcKeys = adr.yaml && adr.yaml.includes("tc-");
+
+	if (!hasMetadata && !hasTc && !hasExistingTcKeys) return;
+
 	const raw = adr.yaml ? stripYamlFences(adr.yaml) : "";
 	let parsed;
 	try {
@@ -333,6 +347,36 @@ function serializeTcToYaml(adr, mode = 'professional') {
 		parsed = {};
 	}
 	if (typeof parsed !== "object") parsed = {};
+
+	// Write MADR 4.0 structured metadata fields so they always appear in the
+	// YAML frontmatter even when adr.yaml is already set (TC-only block).
+	if (adr.status) {
+		parsed["status"] = adr.status;
+	} else {
+		delete parsed["status"];
+	}
+	if (adr.date) {
+		parsed["date"] = adr.date;
+	} else {
+		delete parsed["date"];
+	}
+	if (adr.decisionMakers && adr.decisionMakers.length > 0) {
+		parsed["decision-makers"] = adr.decisionMakers;
+	} else {
+		delete parsed["decision-makers"];
+	}
+	if (adr.consulted && adr.consulted.length > 0) {
+		parsed["consulted"] = adr.consulted;
+	} else {
+		delete parsed["consulted"];
+	}
+	if (adr.informed && adr.informed.length > 0) {
+		parsed["informed"] = adr.informed;
+	} else {
+		delete parsed["informed"];
+	}
+
+	// TC annotation fields.
 	if (adr.tc) {
 		parsed["tc-schema-version"] = 1;
 		parsed["tc-benefit"] = adr.tc.benefit;
@@ -350,7 +394,12 @@ function serializeTcToYaml(adr, mode = 'professional') {
 	} else {
 		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
 	}
-	adr.yaml = "---\n" + yamlDump(parsed, { sortKeys: false }) + "---\n";
+
+	let yamlOutput = yamlDump(parsed, { sortKeys: false, flowLevel: 1 });
+	// Remove unnecessary quotes from date-like strings (js-yaml quotes them
+	// for safety but MADR files use bare date values e.g. date: 2020-12-03)
+	yamlOutput = yamlOutput.replace(/^([\w-]+): ['"](\d{4}-\d{2}-\d{2})['"]/gm, '$1: $2');
+	adr.yaml = "---\n" + yamlOutput.trimEnd() + "\n---\n";
 }
 
 /**
@@ -374,11 +423,82 @@ function parseConsequencesFromMd(md, adr) {
 }
 
 /**
+ * Extracts confirmation text via regex, bypassing ANTLR.
+ * ANTLR tokenizes 'Good, because ', 'Neutral, because ', 'Bad, because ' as special
+ * tokens that multilineText cannot consume, causing parse failures when they appear
+ * in the Confirmation section. Regex extraction avoids this entirely.
+ * @param {string} md
+ * @param {ArchitecturalDecisionRecord} adr
+ */
+function parseConfirmationFromMd(md, adr) {
+	const match = md.match(/###\s+Confirmation\s*\n([\s\S]*?)(?=\n##|\n###|$)/i);
+	if (!match) return;
+	const content = match[1].trim();
+	if (content) {
+		adr.decisionOutcome.confirmation = content;
+	}
+}
+
+/**
+ * Extracts moreInformation and links from the ## More Information section.
+ * Links were appended as bullet items during serialization — this restores them
+ * as separate items in adr.links so the Links UI is populated on reload.
+ * @param {string} md
+ * @param {ArchitecturalDecisionRecord} adr
+ */
+function parseMoreInformationFromMd(md, adr) {
+	const match = md.match(/##\s+More Information\s*\n([\s\S]*?)(?=\n##|$)/i);
+	if (!match) return;
+	const body = match[1];
+	const lines = body.split(/\n/);
+	const textLines = [];
+	const linkLines = [];
+	let inLinks = false;
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (!trimmed) {
+			// blank line — keep tracking context
+			if (!inLinks) textLines.push(line);
+			continue;
+		}
+		if (/^[*\-]\s+/.test(trimmed)) {
+			// bullet item — treat as a link
+			inLinks = true;
+			linkLines.push(trimmed.replace(/^[*\-]\s+/, "").trim());
+		} else {
+			textLines.push(line);
+		}
+	}
+
+	const moreInfoText = textLines.join("\n").trim();
+	if (moreInfoText) {
+		adr.moreInformation = moreInfoText;
+	}
+	if (linkLines.length > 0) {
+		adr.links = linkLines;
+	}
+}
+
+/**
  * Converts a markdown into a MADR object.
  * @param {string} md
  * @returns {ArchitecturalDecisionRecord}
  */
 export function md2adr(md) {
+	// Keep original for regex-based extraction passes that run after the ANTLR walk.
+	const originalMd = md;
+
+	// Strip ### Consequences, ### Confirmation, and ## More Information content
+	// before handing to ANTLR. All three sections are extracted via regex on
+	// originalMd after the walk, so ANTLR never needs to parse their content.
+	// This prevents 'Good, because ' / 'Neutral, because ' / 'Bad, because '
+	// from being tokenized as special argumentList literals in these sections,
+	// which would cause "mismatched input" parse failures.
+	md = md.replace(/\n###\s+Consequences\s*\n[\s\S]*?(?=\n###|\n##|$)/gi, '');
+	md = md.replace(/\n###\s+Confirmation\s*\n[\s\S]*?(?=\n###|\n##|$)/gi, '');
+	md = md.replace(/\n##\s+More Information\s*\n[\s\S]*?(?=\n##|$)/gi, '');
+
 	const chars = new antlr4.InputStream(md);
 	const lexer = new MADRLexer(chars);
 	const tokens = new antlr4.CommonTokenStream(lexer);
@@ -396,7 +516,9 @@ export function md2adr(md) {
 	}
 	printer.adr.parseErrors = errorListener.syntaxErrors;
 	parseTcFromYaml(printer.adr);
-	parseConsequencesFromMd(md, printer.adr);
+	parseConsequencesFromMd(originalMd, printer.adr);
+	parseConfirmationFromMd(originalMd, printer.adr);
+	parseMoreInformationFromMd(originalMd, printer.adr);
 	return printer.adr;
 }
 
@@ -406,37 +528,10 @@ export function adr2md(adrToParse, mode = 'professional') {
 	serializeTcToYaml(adr, mode);
 	let md;
 
-	// YAML frontmatter (MADR 4.0). If adr.yaml is set we preserve it verbatim so that
-	// downstream custom fields (e.g. TC annotations added in Track B) survive a round-trip.
-	// Otherwise build the frontmatter from the structured metadata fields.
+	// YAML frontmatter — serializeTcToYaml writes ALL fields (metadata + TC)
+	// into adr.yaml. If it produced a block, use it. Otherwise no frontmatter.
 	if (adr.yaml) {
-		md = adr.yaml;
-		md = md.concat("\n# " + naturalCase2titleCase(adr.title) + "\n");
-	} else if (
-		adr.status ||
-		adr.date ||
-		adr.decisionMakers.length > 0 ||
-		adr.consulted.length > 0 ||
-		adr.informed.length > 0
-	) {
-		let yamlBody = "---\n";
-		if (adr.status) {
-			yamlBody += `status: "${adr.status}"\n`;
-		}
-		if (adr.date) {
-			yamlBody += `date: ${adr.date}\n`;
-		}
-		if (adr.decisionMakers.length > 0) {
-			yamlBody += `decision-makers: [${adr.decisionMakers.join(", ")}]\n`;
-		}
-		if (adr.consulted.length > 0) {
-			yamlBody += `consulted: [${adr.consulted.join(", ")}]\n`;
-		}
-		if (adr.informed.length > 0) {
-			yamlBody += `informed: [${adr.informed.join(", ")}]\n`;
-		}
-		yamlBody += "---\n";
-		md = yamlBody + "\n# " + naturalCase2titleCase(adr.title) + "\n";
+		md = adr.yaml + "\n# " + naturalCase2titleCase(adr.title) + "\n";
 	} else {
 		md = "# " + naturalCase2titleCase(adr.title) + "\n";
 	}
@@ -517,9 +612,19 @@ export function adr2md(adrToParse, mode = 'professional') {
 		}, md);
 	}
 
-	// MADR 4.0: More Information — top-level H2 at the end (replaces 2.x Links section)
-	if (adr.moreInformation !== "") {
-		md = md.concat("\n## More Information\n\n" + adr.moreInformation + "\n");
+	// MADR 4.0: More Information — top-level H2 at the end (replaces 2.x Links section).
+	// Links are appended as bullet items within this section so nothing is lost.
+	const hasMoreInfo = adr.moreInformation !== "";
+	const hasLinks = adr.links && adr.links.length > 0;
+	if (hasMoreInfo || hasLinks) {
+		md = md.concat("\n## More Information\n\n");
+		if (hasMoreInfo) {
+			md = md.concat(adr.moreInformation + "\n");
+		}
+		if (hasLinks) {
+			if (hasMoreInfo) md = md.concat("\n");
+			md = adr.links.reduce((total, link) => total + "* " + link + "\n", md);
+		}
 	}
 
 	return md;

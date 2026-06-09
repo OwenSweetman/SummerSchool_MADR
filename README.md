@@ -14,7 +14,7 @@ Most teams write ADRs and forget them. TC-ADR Manager makes them actionable:
 
 TC annotations live in the YAML frontmatter of each ADR, version-controlled alongside your code, readable without tooling, and ignorable by tools that don't understand them.
 
-> Built on the original [ADR Manager](https://github.com/adr/adr-manager) by Steven Chen (University of Stuttgart), extended with MADR 4.0 and Technical Credit support as part of the Technical Credit summer school research programme in Sydney by Northeastern students(Tali, Cesca, Owen, Maddie, Sukira) there.
+> Built on the original [ADR Manager](https://github.com/adr/adr-manager) by Steven Chen (University of Stuttgart), extended with MADR 4.0 and Technical Credit support as part of the Technical Credit summer school research programme in Sydney by Northeastern students(Tali, Cesca, Owen, Maddy, Sukira) there.
 
 # Index
 
@@ -67,11 +67,14 @@ As of now, the following commands are supported by this extension:
 1. Be located in the ADR Directory
 2. Follow the naming convention of MADR <br/>(NNNN{-,\_}random{-,\_}title.md, in kebab-case, snake_case or a combination of these two cases, no special characters in the name (? * : " < > / \ |) due to file name limitations, and N corresponds to a number between 0-9)
 
-If the content of a potential ADR detected by the extension does not conform to MADR, an error message will be shown and the user won't be able to view the Markdown file using the provided MADR template(s).
+If the content of a potential ADR detected by the extension does not conform to MADR 4.0, a non-conforming screen is shown with the specific parse error and a button to open the file directly in the text editor for manual correction.
 
-- `Add New ADR`: Opens a webview panel where the user can add a new ADR using the MADR template(s) provided by the extension. The user can choose between a basic template with only the required fields of an ADR and the professional template, displaying all options of MADR 4.0 along with optional Technical Credit (TC) annotation fields.<br/>
-The extension chooses the basic or the professional MADR template according to the user's preferences configured in the user/workspace settings.<br/>
-If the user is working in a multi-root workspace (or a multi-root-like workspace), the extension will ask the user in which ADR Directory of which root folder the newly created ADR should be saved to.
+- `Add New ADR`: Opens a webview panel where the user can add a new ADR using the MADR template(s) provided by the extension. The user can choose between:
+  - **Basic template** — required fields only (title, context, options, decision outcome)
+  - **Professional template** — all MADR 4.0 fields including YAML frontmatter (`status`, `date`, `decision-makers`, `consulted`, `informed`), decision drivers, pros/neutral/cons arguments per option, consequences (Good/Bad), confirmation, more information, links, and full TC annotation fields
+
+  The toggle between basic and professional mode preserves all entered data — switching modes does not lose any field values. The extension chooses the default template according to the user's preferences configured in settings.<br/>
+  If the user is working in a multi-root workspace (or a multi-root-like workspace), the extension will ask the user in which ADR Directory of which root folder the newly created ADR should be saved to.
 
 - `Open ADR Manager On This File`: Only when a Markdown file is open: Prompts the extension to view the Markdown file using the MADR template(s) provided by the extension.<br/>
 This command is not bound to the ADR Directory, i.e., the user may execute this command on an ADR even if it's not located inside of (an) ADR Directory.<br/>
@@ -104,9 +107,13 @@ When opening an ADR in the webview, TC annotation fields are surfaced alongside 
 
 ### TC Dashboard
 
-The extension contributes a **TC Dashboard** sidebar panel in the VS Code Activity Bar. The dashboard scans all ADRs in the active workspace's ADR Directory and lists their TC annotations, with confidence indicators visualising the strength of each claim.
+The extension contributes a **TC Dashboard** sidebar panel in the VS Code Activity Bar. The dashboard scans all ADRs in the active workspace's ADR Directory and displays their TC annotations grouped by category, with confidence indicators (●●●○○) visualising the strength of each claim.
 
-The dashboard refreshes automatically when ADR files in the workspace change.
+- **Categorised** — ADRs with TC annotations are grouped by `tc-category`
+- **Uncategorized** — ADRs that have TC fields but no category are listed separately
+- **Unannotated** — ADRs with no TC fields appear at the bottom
+
+Clicking an ADR in the dashboard opens the file directly in the editor. The dashboard refreshes automatically when ADR files change and immediately after every save from the webview editor.
 
 ### Menus
 
@@ -153,7 +160,7 @@ As of now, this extension contributes the following settings:
 
 - `adrManager.editorMode.addAdrEditorMode`: Specifies the preferred editor mode when creating a new ADR using the extension's webview (default: basic)
   
-- `adrManager.editorMode.viewAdrEditorMode`: Specifies the preferred editor mode when viewing/editing an existing ADR using the extension's webview (default: sufficient; the extension will choose the template based on the content of the ADR)
+- `adrManager.editorMode.viewAdrEditorMode`: Specifies the preferred editor mode when viewing/editing an existing ADR using the extension's webview (default: basic; change to `sufficient` to auto-detect based on ADR content, or `professional` to always open in professional mode)
 
 - `adrManager.treatSingleRootAsMultiRoot`: Specifies whether the extension should treat single-root workspaces with only subdirectories as multi-root workspaces (default: true)
 
@@ -161,11 +168,10 @@ As of now, this extension contributes the following settings:
 
 ## Known Issues
 
-This release is a prototype and may contain errors and bugs. Some features are not implemented yet and some implementations may be subject to change.<br/>
-It is aimed at generating feedback from user evaluation with select stakeholders.
-
 Known limitations as of this release:
 
-- The parser supports MADR 4.0 only. ADRs written in the legacy MADR 2.x format may parse with reduced fidelity. A back-compatibility decision is pending.
-- TC annotation values outside the documented taxonomy (e.g. an unknown `tc-category` value) are passed through without rejection but may surface validation warnings.
-- The TC Dashboard currently lists annotations from ADRs in the configured ADR Directory only; ADRs elsewhere in the workspace are not included.
+- **MADR 2.x compatibility** — The parser supports MADR 4.0 only. ADRs written in the legacy MADR 2.x format (e.g. `### Positive Consequences`, inline `* Status:` fields) will show as non-conforming. Open them in the text editor and update to MADR 4.0 format to edit them in the webview.
+- **TC taxonomy enforcement** — TC annotation values outside the documented taxonomy (e.g. an unknown `tc-category` value) are passed through without rejection at parse time but will surface validation warnings in the editor.
+- **ADR Directory scope** — The TC Dashboard and ADR list only include ADRs in the configured ADR Directory. ADRs stored elsewhere in the workspace are not included.
+- **Consulted / Informed not editable in basic mode** — These MADR 4.0 frontmatter fields are only visible and editable in professional mode. They are preserved if set when switching to basic mode.
+- **Links round-trip** — Links entered in the professional editor are serialised as bullet items inside `## More Information`. On reload they appear in the More Information / Technical Story field rather than as separate link items.

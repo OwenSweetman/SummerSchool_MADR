@@ -1,5 +1,21 @@
 # Changelog
 
+* 0.2.3 - Full data persistence and parser robustness
+  * Fixed status, date, decision-makers, consulted, and informed fields not appearing in YAML frontmatter when saving
+  * Fixed parse failures caused by 'Good, because' / 'Bad, because' tokens in Consequences, Confirmation, and More Information sections — all three now extracted via regex, bypassing ANTLR token conflicts
+  * Added Confirmation textarea to professional editor
+  * Added Consulted and Informed fields to professional editor
+  * Added Neutral arguments section to professional option editor
+  * Links now serialized into More Information section — no longer silently discarded
+  * Links and plain text in More Information now correctly separated on reload
+  * All fields (tc, consulted, informed, confirmation, neutral) now preserved across basic↔professional mode switches
+  * TC annotations without a benefit field but with other TC fields now correctly recognised and categorised
+  * TC Dashboard now refreshes immediately after every create/save
+  * TC Dashboard correctly separates annotated-but-uncategorised ADRs from unannotated ones
+  * ADRs now default to opening in basic mode (setting: viewAdrEditorMode default changed from 'sufficient' to 'basic')
+  * Fixed drag-to-reorder broken in basic mode (visibility: hidden instead of display: none)
+  * Fixed ADR Status label to distinguish it from TC Status in professional editor
+
 * 0.2.2 - README update
   * Updated README for marketplace listing
 

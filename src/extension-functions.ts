@@ -101,7 +101,6 @@ function isProfessionalAdr(adr: ArchitecturalDecisionRecord) {
 		}) ||
 		adr.decisionOutcome.consequences.good.length ||
 		adr.decisionOutcome.consequences.bad.length ||
-		adr.decisionOutcome.confirmation ||
 		adr.moreInformation ||
 		adr.links.length
 	);

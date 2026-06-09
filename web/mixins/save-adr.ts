@@ -14,6 +14,8 @@ export default {
 			date: "",
 			status: "",
 			deciders: "",
+			consulted: "",
+			informed: "",
 			technicalStory: "",
 			contextAndProblemStatement: "",
 			decisionDrivers: [] as string[],
@@ -21,6 +23,7 @@ export default {
 				title: string;
 				description: string;
 				pros: string[];
+				neutral: string[];
 				cons: string[];
 			}[],
 			decisionOutcome: {
@@ -28,6 +31,7 @@ export default {
 				explanation: "",
 				positiveConsequences: [] as string[],
 				negativeConsequences: [] as string[],
+				confirmation: "",
 			},
 			links: [] as string[],
 			tc: {
@@ -61,7 +65,9 @@ export default {
 				tc.category ||
 				tc.conditions ||
 				tc.status ||
+				(tc.confidence && tc.confidence !== 3) ||  // non-default confidence counts
 				(tc.signals && tc.signals.tags && tc.signals.tags.length) ||
+				(tc.signals && tc.signals.note) ||
 				(tc.related && tc.related.length);
 			return hasContent ? tc : undefined;
 		},
@@ -167,6 +173,8 @@ export default {
 			date: string;
 			status: string;
 			deciders: string;
+			consulted?: string;
+			informed?: string;
 			technicalStory: string;
 			contextAndProblemStatement: string;
 			decisionDrivers: string[];
@@ -174,6 +182,7 @@ export default {
 				title: string;
 				description: string;
 				pros: string[];
+				neutral?: string[];
 				cons: string[];
 			}[];
 			decisionOutcome: {
@@ -181,6 +190,7 @@ export default {
 				explanation: string;
 				positiveConsequences: string[];
 				negativeConsequences: string[];
+				confirmation?: string;
 			};
 			links: string[];
 			tc?: Partial<TcAnnotation>;
@@ -190,12 +200,20 @@ export default {
 			this.title = fields.title;
 			this.date = fields.date;
 			this.status = fields.status;
-			this.deciders = fields.deciders;
-			this.technicalStory = fields.technicalStory;
+			this.deciders = fields.deciders ?? "";
+			this.consulted = fields.consulted ?? "";
+			this.informed = fields.informed ?? "";
+			this.technicalStory = fields.technicalStory ?? "";
 			this.contextAndProblemStatement = fields.contextAndProblemStatement;
 			this.decisionDrivers = fields.decisionDrivers;
-			this.consideredOptions = fields.consideredOptions;
-			this.decisionOutcome = fields.decisionOutcome;
+			this.consideredOptions = (fields.consideredOptions ?? []).map((o) => ({
+				...o,
+				neutral: o.neutral ?? [],
+			}));
+			this.decisionOutcome = {
+				...fields.decisionOutcome,
+				confirmation: fields.decisionOutcome.confirmation ?? "",
+			};
 			this.links = fields.links;
 			this.tc = fields.tc ?? this.tc;
 			this.fullPath = fields.fullPath;
@@ -228,13 +246,18 @@ export default {
 						yaml: this.yaml,
 						title: this.title,
 						contextAndProblemStatement: this.contextAndProblemStatement,
-						consideredOptions: this.consideredOptions,
+						// Ensure neutral is present for MADR 4.0 data model
+						consideredOptions: this.consideredOptions.map((o: any) => ({
+							...o,
+							neutral: o.neutral ?? [],
+						})),
 						chosenOption: this.decisionOutcome.chosenOption,
 						explanation: this.decisionOutcome.explanation,
 						tc: this.tcForSaving,
 					})
 				);
 			} else {
+				// Map webview legacy fields to MADR 4.0 data model for the extension
 				this.sendMessage(
 					type,
 					JSON.stringify({
@@ -242,13 +265,26 @@ export default {
 						title: this.title,
 						date: this.date,
 						status: this.status,
-						deciders: this.deciders,
-						technicalStory: this.technicalStory,
+						decisionMakers: this.deciders ? this.deciders.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+						consulted: this.consulted ? this.consulted.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+						informed: this.informed ? this.informed.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
 						contextAndProblemStatement: this.contextAndProblemStatement,
 						decisionDrivers: this.decisionDrivers,
-						consideredOptions: this.consideredOptions,
-						decisionOutcome: this.decisionOutcome,
-						links: this.links.filter((link) => link),
+						consideredOptions: this.consideredOptions.map((o: any) => ({
+							...o,
+							neutral: o.neutral ?? [],
+						})),
+						decisionOutcome: {
+							chosenOption: this.decisionOutcome.chosenOption,
+							explanation: this.decisionOutcome.explanation,
+							consequences: {
+								good: this.decisionOutcome.positiveConsequences ?? [],
+								bad: this.decisionOutcome.negativeConsequences ?? [],
+							},
+							confirmation: this.decisionOutcome.confirmation ?? "",
+						},
+						moreInformation: this.technicalStory ?? "",
+						links: this.links.filter((link: string) => link),
 						tc: this.tcForSaving,
 					})
 				);
@@ -270,11 +306,14 @@ export default {
 						status: naturalCase2titleCase(this.status),
 						// Map webview legacy fields back to MADR 4.0 data model
 						decisionMakers: this.deciders ? this.deciders.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-						consulted: [],
-						informed: [],
+						consulted: this.consulted ? this.consulted.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+						informed: this.informed ? this.informed.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
 						contextAndProblemStatement: this.contextAndProblemStatement,
 						decisionDrivers: this.decisionDrivers,
-						consideredOptions: this.consideredOptions,
+						consideredOptions: (this.consideredOptions ?? []).map((o: any) => ({
+							...o,
+							neutral: o.neutral ?? [],
+						})),
 						decisionOutcome: {
 							chosenOption: this.decisionOutcome.chosenOption,
 							explanation: this.decisionOutcome.explanation,
@@ -282,9 +321,10 @@ export default {
 								good: this.decisionOutcome.positiveConsequences ?? [],
 								bad: this.decisionOutcome.negativeConsequences ?? [],
 							},
-							confirmation: "",
+							confirmation: this.decisionOutcome.confirmation ?? "",
 						},
-						moreInformation: "",
+						// technicalStory has no MADR 4.0 equivalent — store in moreInformation for round-trip
+						moreInformation: this.technicalStory ?? "",
 						links: this.links,
 						tc: this.tcForSaving,
 						fullPath: this.fullPath,

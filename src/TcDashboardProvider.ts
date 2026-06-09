@@ -15,10 +15,17 @@ type TreeNode = CategoryNode | AdrNode | DetailNode;
 
 class CategoryNode extends vscode.TreeItem {
 	readonly kind = "category" as const;
-	constructor(public readonly category: TcCategory | "unannotated", public readonly adrs: AdrEntry[]) {
-		const label = category === "unannotated" ? "Unannotated" : category;
+	constructor(public readonly category: TcCategory | "unannotated" | "uncategorized", public readonly adrs: AdrEntry[]) {
+		const label =
+			category === "unannotated" ? "Unannotated" :
+			category === "uncategorized" ? "Uncategorized (has TC fields)" :
+			category;
 		super(`${label} (${adrs.length})`, vscode.TreeItemCollapsibleState.Expanded);
-		this.iconPath = new vscode.ThemeIcon(category === "unannotated" ? "question" : "tag");
+		this.iconPath = new vscode.ThemeIcon(
+			category === "unannotated" ? "question" :
+			category === "uncategorized" ? "warning" :
+			"tag"
+		);
 		this.contextValue = "tcCategory";
 	}
 }
@@ -62,18 +69,13 @@ function confidenceLabel(c: TcConfidence | undefined): string {
 	return `${"●".repeat(c)}${"○".repeat(5 - c)}  ${CONFIDENCE_NAMES[c]}`;
 }
 
+const CONFIDENCE_COLORS: string[] = ["", "charts.red", "charts.orange", "charts.yellow", "charts.green", "terminal.ansiGreen"];
+
 function confidenceIcon(c: TcConfidence | undefined): vscode.ThemeIcon {
-    if (!c) {
-        return new vscode.ThemeIcon("circle-outline");
-    }
-    const colorMap: Record<number, string> = {
-        1: "charts.red",
-        2: "charts.orange",
-        3: "charts.yellow",
-        4: "charts.green",
-        5: "terminal.ansiGreen",
-    };
-    return new vscode.ThemeIcon("circle-filled", new vscode.ThemeColor(colorMap[c]));
+	if (!c) {
+		return new vscode.ThemeIcon("circle-outline");
+	}
+	return new vscode.ThemeIcon("circle-filled", new vscode.ThemeColor(CONFIDENCE_COLORS[c]));
 }
 
 export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -131,9 +133,16 @@ export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
 			fileName: m.fileName,
 		}));
 
-		const buckets = new Map<TcCategory | "unannotated", AdrEntry[]>();
+		const buckets = new Map<TcCategory | "unannotated" | "uncategorized", AdrEntry[]>();
 		for (const e of entries) {
-			const key: TcCategory | "unannotated" = e.adr.tc?.category ?? "unannotated";
+			let key: TcCategory | "unannotated" | "uncategorized";
+			if (!e.adr.tc) {
+				key = "unannotated";
+			} else if (!e.adr.tc.category) {
+				key = "uncategorized";
+			} else {
+				key = e.adr.tc.category;
+			}
 			const list = buckets.get(key) ?? [];
 			list.push(e);
 			buckets.set(key, list);
@@ -141,15 +150,14 @@ export class TcDashboardProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		return [...buckets.entries()]
 			.sort(([a], [b]) => {
-				if (a === "unannotated") {
-					return 1;
-				}
-				if (b === "unannotated") {
-					return -1;
-				}
+				// unannotated and uncategorized sort last
+				if (a === "unannotated") {return 1;}
+				if (b === "unannotated") {return -1;}
+				if (a === "uncategorized") {return 1;}
+				if (b === "uncategorized") {return -1;}
 				return a.localeCompare(b);
 			})
-			.map(([category, adrs]) => new CategoryNode(category, adrs));
+			.map(([category, adrs]) => new CategoryNode(category as TcCategory | "unannotated", adrs));
 	}
 
 	private getDetailNodes(entry: AdrEntry): DetailNode[] {

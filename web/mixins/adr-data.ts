@@ -11,6 +11,8 @@ export default {
 			date: "",
 			status: "",
 			deciders: "",
+			consulted: "",
+			informed: "",
 			technicalStory: "",
 			contextAndProblemStatement: "",
 			decisionDrivers: [] as string[],
@@ -18,6 +20,7 @@ export default {
 				title: string;
 				description: string;
 				pros: string[];
+				neutral: string[];
 				cons: string[];
 			}[],
 			decisionOutcome: {
@@ -25,6 +28,7 @@ export default {
 				explanation: "",
 				positiveConsequences: [] as string[],
 				negativeConsequences: [] as string[],
+				confirmation: "",
 			},
 			links: [] as string[],
 			tc: {
@@ -85,25 +89,29 @@ export default {
 			this.title = adr.title;
 			this.date = adr.date;
 			this.status = adr.status;
-			this.deciders = adr.deciders;
-			this.technicalStory = adr.technicalStory;
+			this.deciders = adr.deciders ?? "";
+			this.consulted = adr.consulted ?? "";
+			this.informed = adr.informed ?? "";
+			this.technicalStory = adr.technicalStory ?? "";
 			this.contextAndProblemStatement = adr.contextAndProblemStatement;
-			this.decisionDrivers = adr.decisionDrivers.filter((driver) => driver !== "");
-			this.consideredOptions = adr.consideredOptions.map((option) => {
+			this.decisionDrivers = (adr.decisionDrivers ?? []).filter((driver) => driver !== "");
+			this.consideredOptions = (adr.consideredOptions ?? []).map((option) => {
 				return {
 					title: option.title,
 					description: option.description,
-					pros: option.pros.filter((pro) => pro !== ""),
-					cons: option.cons.filter((con) => con !== ""),
+					pros: (option.pros ?? []).filter((pro) => pro !== ""),
+					neutral: (option.neutral ?? []).filter((n) => n !== ""),
+					cons: (option.cons ?? []).filter((con) => con !== ""),
 				};
 			});
 			this.decisionOutcome = {
 				chosenOption: adr.decisionOutcome.chosenOption,
 				explanation: adr.decisionOutcome.explanation,
-				positiveConsequences: adr.decisionOutcome.positiveConsequences.filter((positive) => positive !== ""),
-				negativeConsequences: adr.decisionOutcome.negativeConsequences.filter((negative) => negative !== ""),
+				positiveConsequences: (adr.decisionOutcome.positiveConsequences ?? []).filter((positive) => positive !== ""),
+				negativeConsequences: (adr.decisionOutcome.negativeConsequences ?? []).filter((negative) => negative !== ""),
+				confirmation: adr.decisionOutcome.confirmation ?? "",
 			};
-			this.links = adr.links.filter((link) => link !== "");
+			this.links = (adr.links ?? []).filter((link) => link !== "");
 			if (adr.tc) {
 				this.tc = {
 					benefit: adr.tc.benefit ?? "",
@@ -280,6 +288,8 @@ export default {
 				date: this.date,
 				status: this.status,
 				deciders: this.deciders,
+				consulted: this.consulted,
+				informed: this.informed,
 				technicalStory: this.technicalStory,
 				contextAndProblemStatement: this.contextAndProblemStatement,
 				decisionDrivers: this.decisionDrivers,
@@ -313,7 +323,7 @@ export default {
 			const message = event.data;
 			switch (message.command) {
 				case "addOption": {
-					this.consideredOptions.push({ title: message.option, description: "", pros: [], cons: [] });
+					this.consideredOptions.push({ title: message.option, description: "", pros: [], neutral: [], cons: [] });
 					if (this.consideredOptions.length === 1) {
 						this.selectOption(0);
 					}

@@ -160,15 +160,20 @@ export class WebPanel {
 					}
 					case "createBasicAdr": {
 						createBasicAdr(JSON.parse(e.data));
+						// Refresh dashboard after create so new ADR appears immediately
+						vscode.commands.executeCommand("vscode-adr-manager.refreshTcDashboard");
 						return;
 					}
 					case "createProfessionalAdr": {
 						createProfessionalAdr(JSON.parse(e.data));
+						vscode.commands.executeCommand("vscode-adr-manager.refreshTcDashboard");
 						return;
 					}
 					case "saveAdr": {
 						const uri = await saveAdr(JSON.parse(e.data).adr);
 						if (uri) {
+							// Refresh dashboard after save so TC annotation changes appear immediately
+							vscode.commands.executeCommand("vscode-adr-manager.refreshTcDashboard");
 							this._panel.webview.postMessage({
 								command: "saveSuccessful",
 								newPath: uri.path,
@@ -185,33 +190,28 @@ export class WebPanel {
 						return;
 					}
 					case "switchAddViewBasicToProfessional": {
+						// Store data before switching so webviewReady delivers it after the new page mounts
+						this._pendingAdrMessage = { command: "fetchAdrValues", adr: e.data };
 						vscode.commands.executeCommand("vscode-adr-manager.openAddAdrWebView", "add-professional");
-						// restore data from before the switch
-						this._panel.webview.postMessage({ command: "fetchAdrValues", adr: e.data });
 						return;
 					}
 					case "switchAddViewProfessionalToBasic": {
+						this._pendingAdrMessage = { command: "fetchAdrValues", adr: e.data };
 						vscode.commands.executeCommand("vscode-adr-manager.openAddAdrWebView", "add-basic");
-						// restore data from before the switch
-						this._panel.webview.postMessage({ command: "fetchAdrValues", adr: e.data });
 						return;
 					}
 					case "switchViewingViewBasicToProfessional": {
-						// mdString argument not needed since the editor mode is specified
+						this._pendingAdrMessage = { command: "fetchAdrValues", adr: e.data };
 						vscode.commands.executeCommand(
 							"vscode-adr-manager.openViewAdrWebView",
 							"",
 							"view-professional"
 						);
-						// restore data from before the switch
-						this._panel.webview.postMessage({ command: "fetchAdrValues", adr: e.data });
 						return;
 					}
 					case "switchViewingViewProfessionalToBasic": {
-						// mdString argument not needed since the editor mode is specified
+						this._pendingAdrMessage = { command: "fetchAdrValues", adr: e.data };
 						vscode.commands.executeCommand("vscode-adr-manager.openViewAdrWebView", "", "view-basic");
-						// restore data from before the switch
-						this._panel.webview.postMessage({ command: "fetchAdrValues", adr: e.data });
 						return;
 					}
 					case "updateFileStatus": {
@@ -234,19 +234,14 @@ export class WebPanel {
 	 */
 	async viewAdr(fileUri: vscode.Uri) {
 		const mdString = new TextDecoder().decode(await vscode.workspace.fs.readFile(fileUri));
-
 		const adr = md2adr(mdString);
-		await vscode.commands.executeCommand("vscode-adr-manager.openViewAdrWebView", mdString);
 
-		const adrNumber = await getAdrNumberFromUri(fileUri);
-		// "view-basic" or "view-professional" as page argument doesn't matter here
-		this._updatePanelTitle("view-basic", adrNumber);
-
-		// Store the message — it will be sent once the webview signals "webviewReady"
-		// to avoid a race condition where postMessage fires before the Vue app has mounted.
+		// Build the message BEFORE loading the webview so that if webviewReady arrives
+		// immediately after the HTML is set, _pendingAdrMessage is already populated.
 		//
 		// The webview components use the legacy MADR 2.x field names internally, so we map
 		// the MADR 4.0 data model fields to those names here at the boundary.
+		// technicalStory is stored in moreInformation for round-trip compatibility.
 		this._pendingAdrMessage = {
 			command: "fetchAdrValues",
 			adr: JSON.stringify({
@@ -256,7 +251,9 @@ export class WebPanel {
 				status: adr.status,
 				// MADR 4.0 → webview legacy mapping
 				deciders: adr.decisionMakers?.join(", ") ?? "",
-				technicalStory: "",
+				consulted: adr.consulted?.join(", ") ?? "",
+				informed: adr.informed?.join(", ") ?? "",
+				technicalStory: adr.moreInformation ?? "",
 				contextAndProblemStatement: adr.contextAndProblemStatement,
 				decisionDrivers: adr.decisionDrivers,
 				consideredOptions: adr.consideredOptions.map((o) => ({
@@ -269,6 +266,7 @@ export class WebPanel {
 					explanation: adr.decisionOutcome.explanation,
 					positiveConsequences: adr.decisionOutcome.consequences?.good ?? [],
 					negativeConsequences: adr.decisionOutcome.consequences?.bad ?? [],
+					confirmation: adr.decisionOutcome.confirmation ?? "",
 				},
 				links: adr.links,
 				tc: adr.tc,
@@ -277,6 +275,11 @@ export class WebPanel {
 				parseErrors: adr.parseErrors,
 			}),
 		};
+
+		await vscode.commands.executeCommand("vscode-adr-manager.openViewAdrWebView", mdString);
+
+		const adrNumber = await getAdrNumberFromUri(fileUri);
+		this._updatePanelTitle("view-basic", adrNumber);
 	}
 
 	/**
