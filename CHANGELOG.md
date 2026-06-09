@@ -1,5 +1,15 @@
 # Changelog
 
+* 0.2.4 - Parser and YAML serialization fixes
+  * Fixed codicons (icons) not loading in packaged release — font files now bundled in assets/
+  * Fixed drag-to-reorder in basic mode broken in packaged release — replaced Vue reactive class with CSS-only opacity hover approach
+  * Replaced hand-rolled YAML metadata parser with js-yaml (CORE_SCHEMA) — fixes date quoting, array element quoting (e.g. ['23']), and all edge cases
+  * Fixed decision-makers, consulted, and informed values gaining unnecessary single quotes on each save
+  * Fixed date field not appearing in YAML frontmatter on save
+  * Fixed non-conforming ADR error screen not showing in packaged release (codicons fix)
+  * Added example ADRs: 0006-use-vue3-for-webview-ui and 0007-regex-post-processing-for-madr-sections
+  * Added ADR Status label rename to distinguish from TC Status
+
 * 0.2.3 - Full data persistence and parser robustness
   * Fixed status, date, decision-makers, consulted, and informed fields not appearing in YAML frontmatter when saving
   * Fixed parse failures caused by 'Good, because' / 'Bad, because' tokens in Consequences, Confirmation, and More Information sections — all three now extracted via regex, bypassing ANTLR token conflicts

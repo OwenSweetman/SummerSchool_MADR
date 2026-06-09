@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-06-04
 decision-makers: [Naftali Caplan]
+
 ---
 
 # Store Technical Credit Annotations in YAML Frontmatter

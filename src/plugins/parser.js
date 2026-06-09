@@ -1,5 +1,5 @@
 import { cloneDeep, concat, replace } from "lodash";
-import { load as yamlLoad, dump as yamlDump } from "js-yaml";
+import { load as yamlLoad, dump as yamlDump, CORE_SCHEMA } from "js-yaml";
 
 import antlr4 from "antlr4";
 import MADRLexer from "./parser/MADRLexer.js";
@@ -152,57 +152,47 @@ class MADRGenerator extends MADRListener {
 	 *   key: scalar           — populates a string field
 	 *   key: [a, b, c]        — populates a string[] field
 	 *   key: a, b, c          — populates a string[] field
-	 *   "quoted scalar"       — quotes stripped
-	 *   # comment lines       — skipped
-	 * For richer YAML (nested structures, block lists, multiline) use js-yaml in Track B.
-	 *
+	 * Replaced by js-yaml — see parseYamlMetadata below.
 	 * @param {string} yamlText the raw "---\n...\n---" block from the grammar
 	 */
 	parseYamlMetadata(yamlText) {
-		const inner = yamlText.replace(/^---\s*\n/, "").replace(/\n---\s*$/, "");
-		const lines = inner.split("\n");
-		for (const line of lines) {
-			const trimmed = line.trim();
-			if (!trimmed || trimmed.startsWith("#")) continue;
-			const colonIdx = trimmed.indexOf(":");
-			if (colonIdx === -1) continue;
-			const key = trimmed.substring(0, colonIdx).trim();
-			let value = trimmed.substring(colonIdx + 1).trim();
-			if (
-				(value.startsWith('"') && value.endsWith('"')) ||
-				(value.startsWith("'") && value.endsWith("'"))
-			) {
-				value = value.substring(1, value.length - 1);
-			}
-			switch (key) {
-				case "status":
-					this.adr.status = value;
-					break;
-				case "date":
-					this.adr.date = value;
-					break;
-				case "decision-makers":
-					this.adr.decisionMakers = this.parseYamlList(value);
-					break;
-				case "consulted":
-					this.adr.consulted = this.parseYamlList(value);
-					break;
-				case "informed":
-					this.adr.informed = this.parseYamlList(value);
-					break;
-			}
+		const raw = yamlText.replace(/^---\n?/, "").replace(/\n?---\n?$/, "");
+		let parsed;
+		try {
+			parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
+		} catch (e) {
+			return;
 		}
-	}
+		if (!parsed || typeof parsed !== "object") return;
 
-	parseYamlList(value) {
-		let inner = value.trim();
-		if (inner.startsWith("[") && inner.endsWith("]")) {
-			inner = inner.substring(1, inner.length - 1);
+		// Use js-yaml for robust parsing — handles quoted scalars, block sequences,
+		// flow sequences, and all other YAML edge cases correctly.
+		if (parsed["status"]) {
+			this.adr.status = String(parsed["status"]);
 		}
-		return inner
-			.split(",")
-			.map((s) => s.trim())
-			.filter((s) => s !== "");
+		if (parsed["date"]) {
+			// js-yaml may parse dates as Date objects — normalise to YYYY-MM-DD string
+			const d = parsed["date"];
+			if (d instanceof Date) {
+				this.adr.date = d.toISOString().slice(0, 10);
+			} else {
+				this.adr.date = String(d);
+			}
+		}
+		const toStringArray = (v) => {
+			if (!v) return [];
+			if (Array.isArray(v)) return v.map(String).filter(Boolean);
+			return String(v).split(",").map((s) => s.trim()).filter(Boolean);
+		};
+		if (parsed["decision-makers"]) {
+			this.adr.decisionMakers = toStringArray(parsed["decision-makers"]);
+		}
+		if (parsed["consulted"]) {
+			this.adr.consulted = toStringArray(parsed["consulted"]);
+		}
+		if (parsed["informed"]) {
+			this.adr.informed = toStringArray(parsed["informed"]);
+		}
 	}
 
 	/**
@@ -299,7 +289,7 @@ function parseTcFromYaml(adr) {
 	const raw = stripYamlFences(adr.yaml);
 	let parsed;
 	try {
-		parsed = yamlLoad(raw);
+		parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
 	} catch (e) {
 		return;
 	}
@@ -357,7 +347,7 @@ function serializeTcToYaml(adr, mode = 'professional') {
 	const raw = adr.yaml ? stripYamlFences(adr.yaml) : "";
 	let parsed;
 	try {
-		parsed = yamlLoad(raw) ?? {};
+		parsed = yamlLoad(raw, { schema: CORE_SCHEMA }) ?? {};
 	} catch (e) {
 		parsed = {};
 	}
@@ -410,10 +400,19 @@ function serializeTcToYaml(adr, mode = 'professional') {
 		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
 	}
 
-	let yamlOutput = yamlDump(parsed, { sortKeys: false, flowLevel: 1 });
-	// Remove unnecessary quotes from date-like strings (js-yaml quotes them
-	// for safety but MADR files use bare date values e.g. date: 2020-12-03)
-	yamlOutput = yamlOutput.replace(/^([\w-]+): ['"](\d{4}-\d{2}-\d{2})['"]/gm, '$1: $2');
+	// flowLevel: 1 keeps arrays in flow style (e.g. decision-makers: [Alice, Bob]).
+	// Post-process to remove unnecessary single quotes that yamlDump adds around
+	// values that look like YAML integers or booleans (e.g. '23' -> 23, 'true' -> true
+	// would be wrong — so we only unquote values that are safe plain scalars and whose
+	// string representation is what we want to preserve).
+	let yamlOutput = yamlDump(parsed, { sortKeys: false, flowLevel: 1, schema: CORE_SCHEMA });
+	// Strip single quotes from flow-sequence elements and scalar values that consist
+	// only of characters safe as YAML plain scalars (letters, digits, spaces, - _ .).
+	// Only unquote values that are safe plain scalars AND not YAML keywords
+	const YAML_KEYWORDS = new Set(["true", "false", "null", "yes", "no", "on", "off"]);
+	yamlOutput = yamlOutput.replace(/'([^']+)'/g, (match, v) =>
+		/^[A-Za-z0-9][A-Za-z0-9 _\-.]*$/.test(v) && !YAML_KEYWORDS.has(v.toLowerCase()) ? v : match
+	);
 	adr.yaml = "---\n" + yamlOutput.trimEnd() + "\n---\n";
 }
 
