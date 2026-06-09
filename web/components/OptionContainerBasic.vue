@@ -141,10 +141,10 @@
 	}
 
 	.visible {
-		display: unset;
+		visibility: visible;
 	}
 
 	.invisible {
-		display: none !important;
+		visibility: hidden;
 	}
 </style>

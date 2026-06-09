@@ -11,6 +11,8 @@
 			v-model:date="date"
 			v-model:status="status"
 			v-model:deciders="deciders"
+			v-model:consulted="consulted"
+			v-model:informed="informed"
 			@validate="validateAll"
 			:key="dataFetched"
 		></TemplateDateStatusDecidersSection>
@@ -58,6 +60,7 @@
 			v-model:explanation="decisionOutcome.explanation"
 			v-model:positiveConsequences="decisionOutcome.positiveConsequences"
 			v-model:negativeConsequences="decisionOutcome.negativeConsequences"
+			v-model:confirmation="decisionOutcome.confirmation"
 			@validate="validate('explanation')"
 			@updateArray="validateAll"
 			:key="dataFetched"

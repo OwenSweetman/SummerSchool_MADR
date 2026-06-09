@@ -79,12 +79,15 @@
 						date: this.date,
 						status: this.status,
 						deciders: this.deciders,
+						consulted: this.consulted,
+						informed: this.informed,
 						technicalStory: this.technicalStory,
 						contextAndProblemStatement: this.contextAndProblemStatement,
 						decisionDrivers: this.decisionDrivers,
 						consideredOptions: this.consideredOptions,
 						decisionOutcome: this.decisionOutcome,
 						links: this.links,
+						tc: this.tc,
 						fullPath: this.fullPath,
 					})
 				);

@@ -39,7 +39,9 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("vscode-adr-manager.refreshTcDashboard", () => tcDashboardProvider.refresh())
 	);
 
-	// Refresh dashboard when ADR markdown files change or the ADR directory setting changes
+	// Refresh dashboard when ADR markdown files change or the ADR directory setting changes.
+	// The watcher covers text-editor saves; the refreshTcDashboard command covers
+	// saves made by the extension itself (which may not trigger onDidChange).
 	const adrWatcher = vscode.workspace.createFileSystemWatcher("**/*.md");
 	adrWatcher.onDidCreate(() => tcDashboardProvider.refresh());
 	adrWatcher.onDidChange(() => tcDashboardProvider.refresh());

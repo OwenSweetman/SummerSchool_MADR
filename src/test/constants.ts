@@ -201,6 +201,7 @@ status: proposed
 date: 2020-12-03
 decision-makers: [Decider]
 ---
+
 # Example ADR
 
 ## Context and Problem Statement
