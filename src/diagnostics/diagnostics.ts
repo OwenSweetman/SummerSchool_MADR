@@ -64,15 +64,15 @@ export async function getDiagnostics(doc: vscode.TextDocument): Promise<vscode.D
 
 		// check if chosen option exists in considered options
 		if (/^Chosen option:/i.test(textLines[i])) {
-			if (
-				consideredOptions.findIndex((option) => {
-					return (
-						createShortTitle(option.trim().replace(/"/g, "'")) ===
-						createShortTitle(getChosenOptionFromLine(textLines[i]).trim().replace(/"/g, "'"))
-					);
-				}) === -1
-			) {
-				diagnostics.push(getInvalidChosenOptionDiagnostic(textLines[i], i));
+			const chosen = createShortTitle(getChosenOptionFromLine(textLines[i]).trim().replace(/"/g, "'"));
+			const isListed = consideredOptions.some(
+				(option) => createShortTitle(option.trim().replace(/"/g, "'")) === chosen
+			);
+			if (!isListed) {
+				const line = textLines[i];
+				const firstQuote = line.indexOf('"', 0);
+				const secondQuote = line.indexOf('"', firstQuote + 1);
+				diagnostics.push(allDiagnostics.chosenOption.notInConsideredOptions(i, 0, i, secondQuote + 1));
 			}
 		}
 	}
@@ -271,22 +271,6 @@ function getOptionalFieldsDiagnostics(
 	});
 
 	return optionalFieldsDiagnostics;
-}
-
-/**
- * Returns a diagnostic stating that the chosen option is not listed in the list of considered options
- * @param line The line containing the chosen option
- */
-function getInvalidChosenOptionDiagnostic(line: string, lineNumber: number): vscode.Diagnostic {
-	const indexOfFirstQuote = line.indexOf('"', 0);
-	const indexOfSecondQuote = line.indexOf('"', indexOfFirstQuote + 1);
-	return {
-		severity: vscode.DiagnosticSeverity.Error,
-		message: "Chosen option is not in the list of considered options.",
-		code: "madr-chosen-option-not-in-considered-options",
-		source: "ADR Manager",
-		range: new vscode.Range(lineNumber, 0, lineNumber, indexOfSecondQuote + 1),
-	};
 }
 
 /**

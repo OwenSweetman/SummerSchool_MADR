@@ -7,7 +7,27 @@ import MADRParser from "./parser/MADRParser.js";
 import MADRListener from "./parser/MADRListener.js";
 import { ArchitecturalDecisionRecord } from "./classes";
 import { createShortTitle, naturalCase2titleCase } from "./utils.ts";
-import { stringify } from "querystring";
+
+/**
+ * Normalises a YAML-parsed value to a string array. Accepts:
+ *   - an array (`[a, b]` flow style or `- a\n- b` block style)  -> coerced via String()
+ *   - a single string (`"a, b"` or `a, b`)                       -> split on commas, trimmed
+ *   - undefined / null                                          -> []
+ * Empty strings are filtered out.
+ *
+ * @param {unknown} value the parsed YAML value
+ * @returns {string[]}
+ */
+function toStringArray(value) {
+	if (value === undefined || value === null) return [];
+	if (Array.isArray(value)) {
+		return value.map((v) => String(v).trim()).filter((s) => s !== "");
+	}
+	return String(value)
+		.split(",")
+		.map((s) => s.trim())
+		.filter((s) => s !== "");
+}
 
 /**
  * Creates an ADR from a ParseTree by listening to a ParseTreeWalker.
@@ -147,19 +167,19 @@ class MADRGenerator extends MADRListener {
 		this.adr.moreInformation = ctx.getText();
 	}
 
-	/**
-	 * Minimal YAML parser for MADR 4.0 metadata. Handles:
-	 *   key: scalar           — populates a string field
-	 *   key: [a, b, c]        — populates a string[] field
-	 *   key: a, b, c          — populates a string[] field
-	 * Replaced by js-yaml — see parseYamlMetadata below.
-	 * @param {string} yamlText the raw "---\n...\n---" block from the grammar
-	 */
-	parseYamlMetadata(yamlText) {
-		const raw = yamlText.replace(/^---\n?/, "").replace(/\n?---\n?$/, "");
-		let parsed;
-		try {
-			parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
+/**
+ * Extracts MADR 4.0 metadata fields (status, date, decision-makers, consulted, informed)
+ * from the YAML front-matter block and assigns them to the ADR. Uses js-yaml CORE_SCHEMA
+ * so block lists, multi-line values, and quoted strings are all handled correctly without
+ * date/number quoting side effects.
+ *
+ * @param {string} yamlText the raw "---\n...\n---" block from the grammar
+ */
+parseYamlMetadata(yamlText) {
+    const raw = yamlText.replace(/^---\s*\n/, "").replace(/\n---\s*$/, "");
+    let parsed;
+    try {
+        parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
 		} catch (e) {
 			return;
 		}
@@ -196,28 +216,23 @@ class MADRGenerator extends MADRListener {
 	}
 
 	/**
+	 * Finds the considered-option whose title best matches `optTitle`, used when associating a
+	 * Pros/Cons subsection heading with an entry from the Considered Options list. Tries an
+	 * exact (whitespace + case insensitive) match first, then falls back to a relaxed match.
 	 *
 	 * @param {string} optTitle the title in the "Chosen option" part
+	 * @returns {object|null} the matched option, or null if none found
 	 */
 	getMostSimilarOptionTo(optTitle) {
-		// Find the option with a very similar title.
-		let opt = this.adr.consideredOptions.find(function (opt) {
-			return this.matchOptionTitleAlmostExactly(opt.title, optTitle);
-		}, this);
-		if (opt) {
-			// If a fitting option was found, return it.
-			return opt;
-		}
-		// Else check if there is another (less) similar title.
-		opt = this.adr.consideredOptions.find(function (opt) {
-			return matchOptionTitleMoreRelaxed(opt.title, optTitle);
-		}, this);
-		if (opt) {
-			// If a fitting option was found, return it.
-			return opt;
-		}
-		// just set the option to not found
-		return null;
+		const exactMatch = this.adr.consideredOptions.find((opt) =>
+			this.matchOptionTitleAlmostExactly(opt.title, optTitle)
+		);
+		if (exactMatch) return exactMatch;
+
+		const relaxedMatch = this.adr.consideredOptions.find((opt) =>
+			matchOptionTitleMoreRelaxed(opt.title, optTitle)
+		);
+		return relaxedMatch ?? null;
 	}
 
 	/**
@@ -236,17 +251,17 @@ class MADRGenerator extends MADRListener {
 	}
 
 	/**
+	 * Pushes the text content of each `textLine` child of a list parse-tree node into the
+	 * target array. Empty/whitespace-only items are skipped.
 	 *
-	 * @param {} parseTreeList - a list node in the parse tree.
-	 * @param {string[]} targetList - a js array, where each list entry is copied into.
+	 * @param {object} parseTreeList a list node in the parse tree
+	 * @param {string[]} targetList an array into which list entries are pushed
 	 */
 	addListItemsFromListToList(parseTreeList, targetList) {
-		for (let i = 0; i < parseTreeList.children.length; i++) {
-			if (
-				parseTreeList.children[i].ruleIndex === MADRParser.ruleNames.indexOf("textLine") && // if it is a text line
-				parseTreeList.children[i].getText().trim() !== ""
-			) {
-				targetList.push(parseTreeList.children[i].getText());
+		const textLineRuleIndex = MADRParser.ruleNames.indexOf("textLine");
+		for (const child of parseTreeList.children) {
+			if (child.ruleIndex === textLineRuleIndex && child.getText().trim() !== "") {
+				targetList.push(child.getText());
 			}
 		}
 	}
@@ -522,10 +537,8 @@ export function md2adr(md) {
 	parser.removeErrorListeners();
 	parser.addErrorListener(errorListener);
 	const tree = parser.start(); // 'start' is the name of the starting rule.
-	// console.log('Created Parse Tree! ', tree)
 	const printer = new MADRGenerator();
 	antlr4.tree.ParseTreeWalker.DEFAULT.walk(printer, tree);
-	//console.log("Result ADR ", printer.adr);
 	printer.adr.cleanUp();
 	if (errorListener.syntaxErrors.length > 0) {
 		printer.adr.conforming = false;
@@ -542,7 +555,7 @@ export function adr2md(adrToParse, mode = 'professional') {
 	let adr = cloneDeep(adrToParse);
 	adr.cleanUp();
 	serializeTcToYaml(adr, mode);
-	var md;
+	let md;
 
 	// YAML frontmatter — serializeTcToYaml writes ALL fields (metadata + TC)
 	// into adr.yaml. If it produced a block, use it. Otherwise no frontmatter.
@@ -647,7 +660,7 @@ export function adr2md(adrToParse, mode = 'professional') {
 }
 
 /**
- * Converts an string in snake case into an natural-language-like string.
+ * Converts a string in snake case into a natural-language-like string.
  *
  * Example: '0001-add-status-field' is converted to '0001 Add Status Field'
  *
@@ -658,13 +671,13 @@ export function snakeCase2naturalCase(snake) {
 }
 
 /**
- * Converts an string in natural case into an snake case string.
+ * Converts a string in natural case into a snake case string.
  *
  * Can be used to generate a file name from the title of an ADR.
  *
- * Example: 'Add status Field' is converted to 'add-status-field'
+ * Example: 'Add Status Field' is converted to 'add-status-field'
  *
- * @param {string} snake
+ * @param {string} natural
  */
 export function naturalCase2snakeCase(natural) {
 	return natural.toLowerCase().split(" ").join("-");
