@@ -360,9 +360,10 @@ export class WebPanel {
 		// URI to load styles into webview
 		const STYLE_WEB_URI = webview.asWebviewUri(STYLE_URI);
 
-		// Codicons web URI
+		// Codicons web URI — loaded from assets/ so it works in packaged release
+		// (node_modules is excluded from .vsix when using --no-dependencies)
 		const CODICONS_WEB_URI = webview.asWebviewUri(
-			vscode.Uri.joinPath(this._extensionUri, "node_modules", "@vscode/codicons", "dist", "codicon.css")
+			vscode.Uri.joinPath(this._extensionUri, "assets", "codicon.css")
 		);
 
 		// Use a NONCE to only allow specific scripts to be run

@@ -1,5 +1,5 @@
-import { cloneDeep } from "lodash";
-import { load as yamlLoad, dump as yamlDump } from "js-yaml";
+import { cloneDeep, concat, replace } from "lodash";
+import { load as yamlLoad, dump as yamlDump, CORE_SCHEMA } from "js-yaml";
 
 import antlr4 from "antlr4";
 import MADRLexer from "./parser/MADRLexer.js";
@@ -167,32 +167,52 @@ class MADRGenerator extends MADRListener {
 		this.adr.moreInformation = ctx.getText();
 	}
 
-	/**
-	 * Extracts MADR 4.0 metadata fields (status, date, decision-makers, consulted, informed)
-	 * from the YAML front-matter block and assigns them to the ADR. Uses js-yaml so block lists,
-	 * multi-line values, and quoted strings are handled correctly.
-	 *
-	 * @param {string} yamlText the raw "---\n...\n---" block from the grammar
-	 */
-	parseYamlMetadata(yamlText) {
-		const inner = yamlText.replace(/^---\s*\n/, "").replace(/\n---\s*$/, "");
-		let parsed;
-		try {
-			parsed = yamlLoad(inner);
+/**
+ * Extracts MADR 4.0 metadata fields (status, date, decision-makers, consulted, informed)
+ * from the YAML front-matter block and assigns them to the ADR. Uses js-yaml CORE_SCHEMA
+ * so block lists, multi-line values, and quoted strings are all handled correctly without
+ * date/number quoting side effects.
+ *
+ * @param {string} yamlText the raw "---\n...\n---" block from the grammar
+ */
+parseYamlMetadata(yamlText) {
+    const raw = yamlText.replace(/^---\s*\n/, "").replace(/\n---\s*$/, "");
+    let parsed;
+    try {
+        parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
 		} catch (e) {
 			return;
 		}
 		if (!parsed || typeof parsed !== "object") return;
 
-		if (parsed.status !== undefined) {
-			this.adr.status = String(parsed.status);
+		// Use js-yaml for robust parsing — handles quoted scalars, block sequences,
+		// flow sequences, and all other YAML edge cases correctly.
+		if (parsed["status"]) {
+			this.adr.status = String(parsed["status"]);
 		}
-		if (parsed.date !== undefined) {
-			this.adr.date = String(parsed.date);
+		if (parsed["date"]) {
+			// js-yaml may parse dates as Date objects — normalise to YYYY-MM-DD string
+			const d = parsed["date"];
+			if (d instanceof Date) {
+				this.adr.date = d.toISOString().slice(0, 10);
+			} else {
+				this.adr.date = String(d);
+			}
 		}
-		this.adr.decisionMakers = toStringArray(parsed["decision-makers"]);
-		this.adr.consulted = toStringArray(parsed.consulted);
-		this.adr.informed = toStringArray(parsed.informed);
+		const toStringArray = (v) => {
+			if (!v) return [];
+			if (Array.isArray(v)) return v.map(String).filter(Boolean);
+			return String(v).split(",").map((s) => s.trim()).filter(Boolean);
+		};
+		if (parsed["decision-makers"]) {
+			this.adr.decisionMakers = toStringArray(parsed["decision-makers"]);
+		}
+		if (parsed["consulted"]) {
+			this.adr.consulted = toStringArray(parsed["consulted"]);
+		}
+		if (parsed["informed"]) {
+			this.adr.informed = toStringArray(parsed["informed"]);
+		}
 	}
 
 	/**
@@ -284,7 +304,7 @@ function parseTcFromYaml(adr) {
 	const raw = stripYamlFences(adr.yaml);
 	let parsed;
 	try {
-		parsed = yamlLoad(raw);
+		parsed = yamlLoad(raw, { schema: CORE_SCHEMA });
 	} catch (e) {
 		return;
 	}
@@ -342,7 +362,7 @@ function serializeTcToYaml(adr, mode = 'professional') {
 	const raw = adr.yaml ? stripYamlFences(adr.yaml) : "";
 	let parsed;
 	try {
-		parsed = yamlLoad(raw) ?? {};
+		parsed = yamlLoad(raw, { schema: CORE_SCHEMA }) ?? {};
 	} catch (e) {
 		parsed = {};
 	}
@@ -395,10 +415,19 @@ function serializeTcToYaml(adr, mode = 'professional') {
 		Object.keys(parsed).filter((k) => k.startsWith("tc-")).forEach((k) => delete parsed[k]);
 	}
 
-	let yamlOutput = yamlDump(parsed, { sortKeys: false, flowLevel: 1 });
-	// Remove unnecessary quotes from date-like strings (js-yaml quotes them
-	// for safety but MADR files use bare date values e.g. date: 2020-12-03)
-	yamlOutput = yamlOutput.replace(/^([\w-]+): ['"](\d{4}-\d{2}-\d{2})['"]/gm, '$1: $2');
+	// flowLevel: 1 keeps arrays in flow style (e.g. decision-makers: [Alice, Bob]).
+	// Post-process to remove unnecessary single quotes that yamlDump adds around
+	// values that look like YAML integers or booleans (e.g. '23' -> 23, 'true' -> true
+	// would be wrong — so we only unquote values that are safe plain scalars and whose
+	// string representation is what we want to preserve).
+	let yamlOutput = yamlDump(parsed, { sortKeys: false, flowLevel: 1, schema: CORE_SCHEMA });
+	// Strip single quotes from flow-sequence elements and scalar values that consist
+	// only of characters safe as YAML plain scalars (letters, digits, spaces, - _ .).
+	// Only unquote values that are safe plain scalars AND not YAML keywords
+	const YAML_KEYWORDS = new Set(["true", "false", "null", "yes", "no", "on", "off"]);
+	yamlOutput = yamlOutput.replace(/'([^']+)'/g, (match, v) =>
+		/^[A-Za-z0-9][A-Za-z0-9 _\-.]*$/.test(v) && !YAML_KEYWORDS.has(v.toLowerCase()) ? v : match
+	);
 	adr.yaml = "---\n" + yamlOutput.trimEnd() + "\n---\n";
 }
 
